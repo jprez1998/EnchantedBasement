@@ -1,0 +1,180 @@
+.playing-card {
+  width: 100px;
+  height: 150px;
+  border-radius: 12px;
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  user-select: none;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.playing-card.small {
+  width: 68px;
+  height: 100px;
+  font-size: 13px;
+}
+
+.playing-card.clickable {
+  cursor: pointer;
+}
+
+.playing-card.face-down {
+  background: linear-gradient(135deg, #1a1340 0%, #2d1f5e 100%);
+  border-color: var(--accent-gold);
+  box-shadow: 0 4px 20px rgba(124,58,237,0.3), inset 0 1px 0 rgba(201,162,39,0.2);
+}
+
+.playing-card.face-up.black {
+  background: linear-gradient(160deg, #1e1e2e 0%, #2a2a40 100%);
+  color: #e8e8f0;
+  border-color: rgba(200,200,220,0.3);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+}
+
+.playing-card.face-up.red {
+  background: linear-gradient(160deg, #2a1020 0%, #3d1530 100%);
+  color: #ff6b8a;
+  border-color: rgba(220,100,120,0.4);
+  box-shadow: 0 4px 16px rgba(180,40,60,0.3);
+}
+
+.card-back {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(124,58,237,0.15) 0px,
+      rgba(124,58,237,0.15) 2px,
+      transparent 2px,
+      transparent 10px
+    );
+}
+
+.card-back-pattern {
+  font-size: 32px;
+  color: var(--accent-gold);
+  opacity: 0.8;
+  text-shadow: 0 0 12px var(--glow-gold);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.6; text-shadow: 0 0 8px var(--glow-gold); }
+  50% { opacity: 1; text-shadow: 0 0 20px var(--glow-gold), 0 0 40px var(--glow-gold); }
+}
+
+.card-face {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: 6px;
+  border-radius: 10px;
+}
+
+.card-corner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
+}
+
+.card-corner.bottom-right {
+  align-self: flex-end;
+  align-items: flex-end;
+  transform: rotate(180deg);
+}
+
+.card-rank {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: Georgia, serif;
+  line-height: 1;
+}
+
+.playing-card.small .card-rank {
+  font-size: 14px;
+}
+
+.card-suit {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.card-center-suit {
+  font-size: 36px;
+  text-align: center;
+  align-self: center;
+}
+
+.playing-card.small .card-center-suit {
+  font-size: 26px;
+}
+
+/* Stack */
+.card-stack {
+  position: relative;
+  width: 100px;
+  height: 150px;
+  margin: 0 auto;
+}
+
+.stack-card {
+  position: absolute;
+  width: 100px;
+  height: 150px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1a1340, #2d1f5e);
+  border: 2px solid var(--accent-gold);
+}
+
+.stack-count {
+  position: absolute;
+  bottom: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Flip animation */
+.card-flip-container {
+  perspective: 600px;
+  width: 100px;
+  height: 150px;
+}
+
+.card-flip-inner {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-flip-container.flipped .card-flip-inner {
+  transform: rotateY(180deg);
+}
+
+.card-flip-front,
+.card-flip-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+}
+
+.card-flip-back {
+  transform: rotateY(180deg);
+}
