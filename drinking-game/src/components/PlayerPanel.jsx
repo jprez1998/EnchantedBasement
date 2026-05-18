@@ -1,6 +1,6 @@
 import '../styles/PlayerPanel.css';
 
-export function PlayerPanel({ player, isActive, score, isQuestionMaster, isMate }) {
+export function PlayerPanel({ player, isActive, score, isMate }) {
   const composureColor =
     player.composure >= 70 ? '#4ade80' :
     player.composure >= 40 ? '#facc15' : '#f87171';
@@ -10,7 +10,6 @@ export function PlayerPanel({ player, isActive, score, isQuestionMaster, isMate 
       {isActive && <div className="active-indicator">▶ Your Turn</div>}
       <div className="player-name">
         {player.name}
-        {isQuestionMaster && <span className="badge qm">👑 QM</span>}
         {isMate && <span className="badge mate">🔗 Mate</span>}
       </div>
 

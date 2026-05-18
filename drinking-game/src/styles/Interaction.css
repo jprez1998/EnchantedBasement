@@ -161,6 +161,19 @@
   font-family: 'Cinzel', serif;
 }
 
+.relationship-question {
+  font-family: 'Cinzel', serif;
+  font-size: 18px;
+  color: var(--text-primary);
+  background: rgba(201,162,39,0.08);
+  border: 1px solid rgba(201,162,39,0.2);
+  border-radius: var(--radius-sm);
+  padding: 16px 18px;
+  line-height: 1.5;
+  width: 100%;
+  text-align: center;
+}
+
 .waterfall-note {
   display: flex;
   align-items: center;

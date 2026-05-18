@@ -56,9 +56,6 @@ export function GameBoard({ playerNames, onQuit }) {
         <button className="quit-btn" onClick={() => setQuitConfirm(true)}>✕</button>
         <div className="chalice-indicator">
           🏺 {game.chaliceCount}/4
-          {game.questionMaster !== null && (
-            <span className="qm-badge">👑 {game.players[game.questionMaster].name}</span>
-          )}
           {game.mateActive && <span className="mate-badge">🔗 Mate</span>}
         </div>
         <div className="deck-count">{game.deck.length} cards</div>
@@ -69,14 +66,12 @@ export function GameBoard({ playerNames, onQuit }) {
           player={game.players[0]}
           isActive={game.currentPlayer === 0}
           score={game.getScore(0)}
-          isQuestionMaster={game.questionMaster === 0}
           isMate={game.mateActive && game.currentPlayer === 1}
         />
         <PlayerPanel
           player={game.players[1]}
           isActive={game.currentPlayer === 1}
           score={game.getScore(1)}
-          isQuestionMaster={game.questionMaster === 1}
           isMate={game.mateActive && game.currentPlayer === 0}
         />
       </div>

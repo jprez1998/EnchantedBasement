@@ -28,7 +28,6 @@ export function useGameState(playerNames) {
     { name: playerNames[1], sips: 0, composure: INITIAL_COMPOSURE },
   ]);
   const [chaliceCount, setChaliceCount] = useState(0);
-  const [questionMaster, setQuestionMaster] = useState(null);
   const [mateActive, setMateActive] = useState(false);
   const [composurePending, setComposurePending] = useState(null);
   const [lastInteraction, setLastInteraction] = useState(null); // { type, drawerIdx, data }
@@ -95,17 +94,6 @@ export function useGameState(playerNames) {
         addLog(`${players[drawerIdx].name} drew a King! Pour into the Chalice (${newCount}/4)`);
       }
       setLastInteraction({ type: 'chalice', drawerIdx, data: { count: newCount, isLast } });
-      setDiscardPile(prev => [...prev, currentCard]);
-      setCurrentCard(null);
-      setPhase('interaction');
-      return;
-    }
-
-    // Question master
-    if (rule.interaction === 'question_master') {
-      setQuestionMaster(drawerIdx);
-      addLog(`${players[drawerIdx].name} is now the Question Master 👑`);
-      setLastInteraction({ type: 'question_master', drawerIdx, data: {} });
       setDiscardPile(prev => [...prev, currentCard]);
       setCurrentCard(null);
       setPhase('interaction');
@@ -243,7 +231,6 @@ export function useGameState(playerNames) {
       { name: playerNames[1], sips: 0, composure: INITIAL_COMPOSURE },
     ]);
     setChaliceCount(0);
-    setQuestionMaster(null);
     setMateActive(false);
     setComposurePending(null);
     setGameLog([]);
@@ -256,7 +243,6 @@ export function useGameState(playerNames) {
     phase,
     players,
     chaliceCount,
-    questionMaster,
     mateActive,
     composurePending,
     gameLog,

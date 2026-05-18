@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { getRuleForCard } from '../utils/cardRules';
-import { getRandomRhymeWord, getRandomCategory } from '../utils/challenges';
+import { getRandomRhymeWord, getRandomCategory, getRandomRelationshipQuestion } from '../utils/challenges';
 import '../styles/Interaction.css';
 
 export function InteractionScreen({ card, lastInteraction, drawerIdx, players, chaliceCount, onResolve, onNext }) {
   const [reflexPressed, setReflexPressed] = useState(null);
   const [rhymeWord] = useState(() => getRandomRhymeWord());
   const [category] = useState(() => getRandomCategory());
+  const [relationshipQuestion] = useState(() =>
+    getRandomRelationshipQuestion(players[drawerIdx].name)
+  );
 
   const drawerName = players[drawerIdx].name;
   const otherName = players[drawerIdx === 0 ? 1 : 0].name;
@@ -41,19 +44,6 @@ export function InteractionScreen({ card, lastInteraction, drawerIdx, players, c
     );
   }
 
-  if (interactionType === 'question_master' || (!card && lastInteraction?.type === 'question_master')) {
-    return (
-      <div className="interaction-screen">
-        <div className="interaction-card">
-          <div className="rule-icon">👑</div>
-          <h2>Question Master</h2>
-          <p>{drawerName} is now the Question Master!</p>
-          <p className="small-note">If {otherName} answers any question directly (not with a question), they drink 3 sips. Lasts until the next Queen.</p>
-          <button className="action-btn" onClick={onNext}>Understood →</button>
-        </div>
-      </div>
-    );
-  }
 
   if (interactionType === 'mate' || (!card && lastInteraction?.type === 'mate')) {
     return (
@@ -206,6 +196,29 @@ export function InteractionScreen({ card, lastInteraction, drawerIdx, players, c
             </button>
             <button className="choice-btn take" onClick={() => onResolve('drawer')}>
               {drawerName} lost! 🍺
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (rule.interaction === 'relationship_question') {
+    return (
+      <div className="interaction-screen">
+        <div className="interaction-card">
+          <div className="rule-icon">{rule.icon}</div>
+          <h2>{rule.name}</h2>
+          <p className="small-note">Question for {otherName}:</p>
+          <div className="relationship-question">{relationshipQuestion}</div>
+          <p className="small-note">{drawerName} knows the answer — judge honestly!</p>
+          <p className="small-note">Wrong answer = {otherName} drinks {rule.loserSips} sips 🍺</p>
+          <div className="choice-row">
+            <button className="choice-btn give" onClick={() => onResolve('other')}>
+              ❌ Wrong — {otherName} drinks!
+            </button>
+            <button className="choice-btn take" onClick={() => onNext()}>
+              ✅ Correct — no sips
             </button>
           </div>
         </div>

@@ -73,6 +73,35 @@ export const COMPOSURE_CHALLENGES = [
   },
 ];
 
+// Relationship questions — [drawer] is replaced with the drawer's name at render time
+export const RELATIONSHIP_QUESTIONS = [
+  'What is [drawer]\'s favorite meal?',
+  'What did [drawer] want to be when they grew up?',
+  'What is [drawer]\'s biggest pet peeve?',
+  'What is [drawer]\'s go-to comfort food?',
+  'What is [drawer]\'s most-used phrase?',
+  'What is [drawer]\'s biggest fear?',
+  'What would [drawer] order at a restaurant without looking at the menu?',
+  'What is [drawer]\'s favorite way to spend a Sunday?',
+  'What habit of [drawer]\'s secretly annoys you the most?',
+  'What is [drawer]\'s love language?',
+  'What song always makes [drawer] think of you two?',
+  'What\'s [drawer]\'s most embarrassing moment you know about?',
+  'What is [drawer]\'s hidden talent?',
+  'What would [drawer] do with a surprise free day alone?',
+  'What was [drawer]\'s childhood nickname?',
+  'What is [drawer]\'s favourite TV show?',
+  'Who is [drawer]\'s celebrity crush?',
+  'What does [drawer] always forget to do?',
+  'What is [drawer]\'s most used emoji?',
+  'Where does [drawer] want to travel most?',
+];
+
+export function getRandomRelationshipQuestion(drawerName) {
+  const template = RELATIONSHIP_QUESTIONS[Math.floor(Math.random() * RELATIONSHIP_QUESTIONS.length)];
+  return template.replace(/\[drawer\]/g, drawerName);
+}
+
 export function getRandomComposureChallenge() {
   const category = COMPOSURE_CHALLENGES[Math.floor(Math.random() * COMPOSURE_CHALLENGES.length)];
   const item = category.items[Math.floor(Math.random() * category.items.length)];
