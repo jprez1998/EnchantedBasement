@@ -34,6 +34,7 @@ export function SetupScreen({ onStart }) {
 
         <div className="rules-card">
           <h3>Get it wrong, take your medicine</h3>
+          <div className="rule-row"><span className="rule-emoji">🎲</span><span>Each question's <b>difficulty is dealt at random</b> — no choosing!</span></div>
           <div className="rule-row"><span className="rule-emoji">🟢</span><span><b>Easy</b> wrong → 🥃 a SHOT of soju</span></div>
           <div className="rule-row"><span className="rule-emoji">🟡</span><span><b>Medium</b> wrong → 🍺 a LARGE sip</span></div>
           <div className="rule-row"><span className="rule-emoji">🔴</span><span><b>Hard</b> wrong → 💧 one normal sip</span></div>

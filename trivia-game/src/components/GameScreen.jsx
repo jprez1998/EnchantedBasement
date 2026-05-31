@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { DifficultyChooser } from './DifficultyChooser';
 import { QuestionCard } from './QuestionCard';
 import { AssignShots } from './AssignShots';
 import { Scoreboard } from './Scoreboard';
@@ -38,10 +37,6 @@ export function GameScreen({ game }) {
       <Scoreboard players={game.players} currentIdx={game.current} compact />
 
       <div className="game-body">
-        {game.phase === 'choose' && (
-          <DifficultyChooser playerName={player.name} onChoose={game.chooseDifficulty} />
-        )}
-
         {(game.phase === 'question' || game.phase === 'mystery') && game.shuffledOptions && (
           <QuestionCard
             key={`${game.turnCount}-${game.activeQuestion.question}`}

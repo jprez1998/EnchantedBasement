@@ -13,6 +13,7 @@ const POOLS = {
   medium: MEDIUM_QUESTIONS,
   hard: HARD_QUESTIONS,
 };
+const DIFFICULTIES = ['easy', 'medium', 'hard'];
 
 function makePlayer(name) {
   return {
@@ -28,7 +29,7 @@ export function useTriviaGame() {
   const [players, setPlayers] = useState([]);
   const [current, setCurrent] = useState(0);
   const [turnCount, setTurnCount] = useState(0);
-  const [phase, setPhase] = useState('setup'); // setup | choose | question | mystery | result | end
+  const [phase, setPhase] = useState('setup'); // setup | question | mystery | assign | end
   const [activeQuestion, setActiveQuestion] = useState(null);
   const [activeDifficulty, setActiveDifficulty] = useState(null);
   const [isMystery, setIsMystery] = useState(false);
@@ -38,15 +39,6 @@ export function useTriviaGame() {
   // Track used questions to reduce repeats within a game.
   const usedRef = useRef({ easy: new Set(), medium: new Set(), hard: new Set(), mystery: new Set() });
   const lastWasMystery = useRef(false);
-
-  const startGame = useCallback((names) => {
-    setPlayers(names.map(makePlayer));
-    setCurrent(0);
-    setTurnCount(0);
-    usedRef.current = { easy: new Set(), medium: new Set(), hard: new Set(), mystery: new Set() };
-    lastWasMystery.current = false;
-    setPhase('choose');
-  }, []);
 
   const pickFromPool = useCallback((poolKey, pool) => {
     const used = usedRef.current[poolKey];
@@ -61,18 +53,55 @@ export function useTriviaGame() {
     return q;
   }, []);
 
-  // Player picked a difficulty for a normal question.
-  const chooseDifficulty = useCallback((difficulty) => {
-    const q = pickFromPool(difficulty, POOLS[difficulty]);
+  const toShuffled = (q) => {
     const opts = shuffle(q.options.map((text, i) => ({ text, isCorrect: i === q.correct })));
-    setActiveQuestion(q);
-    setActiveDifficulty(difficulty);
-    setShuffledOptions({
+    return {
       options: opts.map(o => o.text),
       correctIdx: opts.findIndex(o => o.isCorrect),
-    });
+    };
+  };
+
+  // Deal a normal question with a RANDOMLY assigned difficulty.
+  const dealNormal = useCallback(() => {
+    const difficulty = DIFFICULTIES[Math.floor(Math.random() * DIFFICULTIES.length)];
+    const q = pickFromPool(difficulty, POOLS[difficulty]);
+    lastWasMystery.current = false;
+    setActiveQuestion(q);
+    setActiveDifficulty(difficulty);
+    setShuffledOptions(toShuffled(q));
+    setIsMystery(false);
     setPhase('question');
   }, [pickFromPool]);
+
+  // Deal a surprise Mystery Round.
+  const dealMystery = useCallback(() => {
+    const q = pickFromPool('mystery', MYSTERY_QUESTIONS);
+    const shots = 1 + Math.floor(Math.random() * 3); // 1–3 shots to assign
+    lastWasMystery.current = true;
+    setActiveQuestion({ ...q, mysteryShots: shots });
+    setActiveDifficulty(null);
+    setShuffledOptions(toShuffled(q));
+    setIsMystery(true);
+    setPhase('mystery');
+  }, [pickFromPool]);
+
+  // Decide and deal the next turn. Mystery never on the very first turn
+  // (allowMystery=false) and never twice in a row.
+  const dealTurn = useCallback((allowMystery) => {
+    const triggerMystery =
+      allowMystery && !lastWasMystery.current && Math.random() < MYSTERY_CHANCE;
+    if (triggerMystery) dealMystery();
+    else dealNormal();
+  }, [dealMystery, dealNormal]);
+
+  const startGame = useCallback((names) => {
+    setPlayers(names.map(makePlayer));
+    setCurrent(0);
+    setTurnCount(0);
+    usedRef.current = { easy: new Set(), medium: new Set(), hard: new Set(), mystery: new Set() };
+    lastWasMystery.current = false;
+    dealTurn(false);
+  }, [dealTurn]);
 
   // Player answered a normal question.
   const answerQuestion = useCallback((selectedIdx) => {
@@ -135,31 +164,9 @@ export function useTriviaGame() {
   const nextTurn = useCallback(() => {
     setCurrent(prev => (prev + 1) % players.length);
     setTurnCount(prev => prev + 1);
-    setActiveQuestion(null);
-    setActiveDifficulty(null);
-    setShuffledOptions(null);
     setLastResult(null);
-    // Decide the next turn type immediately.
-    const triggerMystery =
-      !lastWasMystery.current && Math.random() < MYSTERY_CHANCE;
-    if (triggerMystery) {
-      const q = pickFromPool('mystery', MYSTERY_QUESTIONS);
-      const shots = 1 + Math.floor(Math.random() * 3);
-      const opts = shuffle(q.options.map((text, i) => ({ text, isCorrect: i === q.correct })));
-      lastWasMystery.current = true;
-      setActiveQuestion({ ...q, mysteryShots: shots });
-      setShuffledOptions({
-        options: opts.map(o => o.text),
-        correctIdx: opts.findIndex(o => o.isCorrect),
-      });
-      setIsMystery(true);
-      setPhase('mystery');
-    } else {
-      lastWasMystery.current = false;
-      setIsMystery(false);
-      setPhase('choose');
-    }
-  }, [players.length, pickFromPool]);
+    dealTurn(true);
+  }, [players.length, dealTurn]);
 
   const endGame = useCallback(() => setPhase('end'), []);
 
@@ -169,22 +176,23 @@ export function useTriviaGame() {
     setTurnCount(0);
     usedRef.current = { easy: new Set(), medium: new Set(), hard: new Set(), mystery: new Set() };
     lastWasMystery.current = false;
+    setLastResult(null);
+    dealTurn(false);
+  }, [dealTurn]);
+
+  const newPlayers = useCallback(() => {
+    setPlayers([]);
     setActiveQuestion(null);
     setActiveDifficulty(null);
     setShuffledOptions(null);
     setLastResult(null);
-    setPhase('choose');
-  }, []);
-
-  const newPlayers = useCallback(() => {
-    setPlayers([]);
     setPhase('setup');
   }, []);
 
   return {
     players, current, turnCount, phase,
     activeQuestion, activeDifficulty, isMystery, lastResult, shuffledOptions,
-    startGame, chooseDifficulty, answerQuestion, answerMystery,
+    startGame, answerQuestion, answerMystery,
     assignMysteryShots, beginAssign, nextTurn, endGame, playAgain, newPlayers,
   };
 }
