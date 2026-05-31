@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍻</text></svg>" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Enchanted Basement" />
+    <meta name="theme-color" content="#0a0612" />
+    <title>Enchanted Basement — Game Night</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Outfit:wght@400;500;600;700&display=swap');
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; }
+      body {
+        font-family: 'Outfit', system-ui, sans-serif;
+        color: #f1f5ff;
+        background:
+          radial-gradient(circle at 18% 0%, #2a1e55 0%, transparent 45%),
+          radial-gradient(circle at 82% 100%, #4a2545 0%, transparent 45%),
+          #0a0612;
+        min-height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 32px 22px;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap { width: 100%; max-width: 440px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
+      .logo { font-size: 60px; animation: bob 2.8s ease-in-out infinite; }
+      @keyframes bob { 0%,100%{transform:translateY(0) rotate(-3deg);} 50%{transform:translateY(-9px) rotate(3deg);} }
+      h1 {
+        font-family: 'Cinzel', serif;
+        font-size: 34px;
+        text-align: center;
+        line-height: 1.1;
+        background: linear-gradient(90deg, #f0c84a, #a78bfa);
+        -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+      }
+      .tagline { color: #aab4d4; font-size: 15px; text-align: center; margin-top: -10px; }
+      .games { width: 100%; display: flex; flex-direction: column; gap: 16px; margin-top: 6px; }
+      .game-card {
+        display: flex; align-items: center; gap: 16px;
+        text-decoration: none; color: inherit;
+        background: rgba(26,35,66,0.85);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 20px;
+        padding: 20px;
+        transition: transform 0.15s, box-shadow 0.25s, border-color 0.25s;
+      }
+      .game-card:active { transform: scale(0.97); }
+      .game-card.cards:hover { border-color: #c9a227; box-shadow: 0 12px 32px rgba(201,162,39,0.3); transform: translateY(-3px); }
+      .game-card.trivia:hover { border-color: #8b5cf6; box-shadow: 0 12px 32px rgba(139,92,246,0.35); transform: translateY(-3px); }
+      .gc-icon { font-size: 44px; flex-shrink: 0; }
+      .gc-text { display: flex; flex-direction: column; gap: 3px; }
+      .gc-title { font-family: 'Cinzel', serif; font-size: 20px; font-weight: 700; }
+      .gc-desc { font-size: 13px; color: #aab4d4; line-height: 1.4; }
+      .gc-arrow { margin-left: auto; font-size: 22px; color: #6b78a0; }
+      .footer { font-size: 12px; color: #6b5f8a; text-align: center; margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="logo">🍻</div>
+      <h1>Enchanted Basement</h1>
+      <p class="tagline">Two ways to lose your composure. Pick your game.</p>
+
+      <div class="games">
+        <a class="game-card cards" href="./cards/">
+          <span class="gc-icon">🏺</span>
+          <span class="gc-text">
+            <span class="gc-title">The Card Ritual</span>
+            <span class="gc-desc">2-player Kings Cup-style card game. Draw cards, drink, and keep your composure to win.</span>
+          </span>
+          <span class="gc-arrow">›</span>
+        </a>
+
+        <a class="game-card trivia" href="./trivia/">
+          <span class="gc-icon">🧠</span>
+          <span class="gc-text">
+            <span class="gc-title">Brain &amp; Booze</span>
+            <span class="gc-desc">Multiplayer trivia. Easy/medium/hard questions, drink when you're wrong, mystery rounds let you dish out shots.</span>
+          </span>
+          <span class="gc-arrow">›</span>
+        </a>
+      </div>
+
+      <p class="footer">🔞 Play responsibly · Add to Home Screen for app mode</p>
+    </div>
+  </body>
+</html>
