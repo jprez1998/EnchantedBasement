@@ -1,0 +1,68 @@
+.scoreboard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 16px;
+}
+
+.scoreboard.compact {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 16px 4px;
+}
+
+.score-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-card);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 10px;
+  padding: 7px 11px;
+  gap: 8px;
+}
+
+.scoreboard.compact .score-row {
+  flex: 1 1 auto;
+  min-width: calc(50% - 6px);
+  font-size: 13px;
+}
+
+.score-row.active {
+  border-color: var(--brand-2);
+  background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(139,92,246,0.15));
+  box-shadow: 0 0 0 1px rgba(139,92,246,0.3);
+}
+
+.sr-name {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sr-arrow { color: var(--brand-2); font-size: 11px; }
+
+.sr-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.sr-score {
+  font-weight: 700;
+  color: var(--gold);
+  font-size: 13px;
+}
+
+.sr-drinks {
+  display: flex;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
