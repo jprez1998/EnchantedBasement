@@ -581,6 +581,9 @@
     $("#drawer-backdrop").onclick = closeDrawer;
     $("#report-close").onclick = $("#report-ok").onclick = () => ($("#report-backdrop").hidden = true);
     $("#help-close").onclick = $("#help-ok").onclick = () => ($("#help-backdrop").hidden = true);
+    // Tap the dark area outside a modal to dismiss it (mobile-friendly).
+    $("#report-backdrop").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.hidden = true; });
+    $("#help-backdrop").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.hidden = true; });
     $("#btn-copy-prompt").onclick = () => {
       const txt = $("#analysis-prompt").textContent;
       navigator.clipboard?.writeText(txt).then(() => toast("Prompt copied")).catch(() => toast("Copy failed"));

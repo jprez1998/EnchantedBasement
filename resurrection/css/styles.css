@@ -186,8 +186,10 @@ body {
 
 /* ---- Modals --------------------------------------------------------------- */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(20,12,4,0.45); z-index: 60; display: flex; align-items: center; justify-content: center; padding: 20px; }
+/* The hidden attribute must win over display:flex above, or modals can't close. */
+.modal-backdrop[hidden] { display: none; }
 .modal { background: var(--parchment); border-radius: var(--radius); width: min(760px, 96vw); max-height: 88vh; display: flex; flex-direction: column; box-shadow: var(--shadow); }
-.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.modal-head { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--line); }
 .modal-head h2 { margin: 0; }
 .modal-body { padding: 18px 20px; overflow-y: auto; line-height: 1.5; }
 .modal-foot { display: flex; gap: 10px; justify-content: flex-end; padding: 14px 20px; border-top: 1px solid var(--line); }
