@@ -1,13 +1,16 @@
 # Enchanted Basement
 
-A small hub of interactive experiments. The landing page (`index.html`) links
-out to each app; apps live in their own folders so they stay independent.
-
-- **Homepage** — `/` (`index.html`, `css/home.css`)
-- **Resurrection Bayes Table** — `/resurrection/`
-
-Deployed via GitHub Pages from `main`:
+GitHub Pages for this repo is published from the **`gh-pages`** branch:
 **https://jprez1998.github.io/EnchantedBasement/**
+
+That branch hosts the Game Night hub and its games (`cards/`, `trivia/`).
+The Resurrection Bayes Table is a separate subpage living alongside them:
+
+- **Game Night hub** — `/` (on `gh-pages`)
+- **Resurrection Bayes Table** — `/resurrection/` (on `gh-pages`)
+
+> The calculator's source also lives on the `claude/bayesian-resurrection-calculator-zhr5s`
+> branch. `main` intentionally holds no published site — `gh-pages` is the single source.
 
 ---
 
@@ -23,10 +26,11 @@ upload — the tool never invents a quotation.
 
 ## Run it
 
-No build step. Just open `index.html` in a browser, or serve the folder:
+No build step. From the `gh-pages` branch, open `resurrection/index.html` in a
+browser, or serve the folder:
 
 ```bash
-python3 -m http.server 8000   # then visit http://localhost:8000
+python3 -m http.server 8000   # then visit http://localhost:8000/resurrection/
 ```
 
 ## What it does
