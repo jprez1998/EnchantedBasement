@@ -1,8 +1,21 @@
-# Resurrection Bayes Table
+# Enchanted Basement
+
+A small hub of interactive experiments. The landing page (`index.html`) links
+out to each app; apps live in their own folders so they stay independent.
+
+- **Homepage** — `/` (`index.html`, `css/home.css`)
+- **Resurrection Bayes Table** — `/resurrection/`
+
+Deployed via GitHub Pages from `main`:
+**https://jprez1998.github.io/EnchantedBasement/**
+
+---
+
+## Resurrection Bayes Table  (`/resurrection/`)
 
 An interactive **Bayesian model-comparison** tool for weighing the historical
 plausibility of the death, burial, and resurrection of Jesus against
-naturalistic alternatives. Built for the Enchanted Basement.
+naturalistic alternatives.
 
 It is a transparent statistical instrument, not an oracle: every number is an
 **editable prior**, and every citation is quoted **verbatim** from sources *you*
@@ -50,13 +63,15 @@ python3 -m http.server 8000   # then visit http://localhost:8000
 
 | File | Purpose |
 |------|---------|
-| `index.html` | Layout and markup |
-| `css/styles.css` | Wood-and-parchment theme |
-| `js/bayes.js` | Pure statistical engine (no DOM) |
-| `js/criteria.js` | Default hypotheses + criteria with real scholarly references |
-| `js/sources.js` | Verbatim, no-hallucination citation matcher |
-| `js/app.js` | UI controller |
-| `sample-source.txt` | A demo source so the citation feature works immediately |
+| `index.html` | Enchanted Basement homepage |
+| `css/home.css` | Homepage theme |
+| `resurrection/index.html` | Calculator layout and markup |
+| `resurrection/css/styles.css` | Wood-and-parchment theme |
+| `resurrection/js/bayes.js` | Pure statistical engine (no DOM) |
+| `resurrection/js/criteria.js` | Default hypotheses + criteria with real scholarly references |
+| `resurrection/js/sources.js` | Verbatim, no-hallucination citation matcher |
+| `resurrection/js/app.js` | UI controller |
+| `resurrection/sample-source.txt` | A demo source so the citation feature works immediately |
 
 ## On honesty
 

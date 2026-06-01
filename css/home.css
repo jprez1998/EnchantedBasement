@@ -1,0 +1,54 @@
+/* =============================================================================
+ * home.css — Enchanted Basement landing page (warm wood + parchment).
+ * ========================================================================== */
+:root {
+  --wood-deep: #2b1d12;
+  --wood: #3c2a1a;
+  --parchment: #f4ecdd;
+  --ink: #2a2017;
+  --gold: #c9a227;
+  --gold-soft: #e6cf86;
+  --line: #d8c9aa;
+  --shadow: 0 6px 24px rgba(20, 12, 4, 0.18);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: "Iowan Old Style", "Palatino Linotype", Georgia, "Times New Roman", serif;
+  color: var(--ink);
+  background:
+    radial-gradient(1100px 560px at 50% -12%, rgba(201,162,39,0.16), transparent),
+    linear-gradient(160deg, #fbf6ea, #efe4cf 60%, #e7d8ba);
+  min-height: 100vh;
+}
+.home { max-width: 980px; margin: 0 auto; padding: 48px 22px 60px; }
+
+.hero { text-align: center; margin-bottom: 38px; }
+.hero-logo {
+  width: 120px; height: 120px; border-radius: 50%;
+  box-shadow: 0 0 0 3px var(--gold-soft), var(--shadow); background: var(--parchment);
+}
+.hero h1 { font-size: 2.4rem; margin: 18px 0 6px; letter-spacing: 0.5px; color: var(--wood-deep); }
+.tagline { margin: 0; font-size: 1.05rem; color: #6a5b44; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.card {
+  display: flex; flex-direction: column; gap: 8px;
+  background: rgba(255,255,255,0.74); border: 1px solid var(--line); border-radius: 16px;
+  padding: 24px 22px; box-shadow: var(--shadow); text-decoration: none; color: inherit;
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+.card:not(.disabled):hover { transform: translateY(-4px); box-shadow: 0 14px 36px rgba(20,12,4,0.24); border-color: var(--gold); }
+.card-icon {
+  width: 52px; height: 52px; display: grid; place-items: center; font-size: 1.6rem;
+  background: linear-gradient(180deg, var(--wood), var(--wood-deep)); color: var(--gold-soft);
+  border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(230,207,134,0.3);
+}
+.card h2 { margin: 10px 0 2px; font-size: 1.3rem; color: var(--wood-deep); }
+.card p { margin: 0; font-size: 0.94rem; line-height: 1.45; color: #4a3c28; }
+.card-cta { margin-top: 10px; font-weight: 700; color: var(--gold); }
+.card-cta.muted { color: #9a8a6e; }
+.card.disabled { opacity: 0.62; cursor: default; }
+.card.disabled .card-icon { filter: grayscale(0.5); }
+
+.home-footer { text-align: center; margin-top: 44px; font-size: 0.85rem; color: #6a5b44; }

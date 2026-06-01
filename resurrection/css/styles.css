@@ -43,6 +43,7 @@ body {
   position: sticky; top: 0; z-index: 30;
 }
 .brand { display: flex; align-items: center; gap: 14px; }
+.brand-home { display: flex; line-height: 0; border-radius: 50%; }
 .brand-logo { width: 54px; height: 54px; border-radius: 50%; box-shadow: 0 0 0 2px var(--gold-soft); background: var(--parchment); }
 .brand-text h1 { font-size: 1.35rem; margin: 0; letter-spacing: 0.3px; }
 .brand-text p { margin: 2px 0 0; font-size: 0.82rem; color: var(--gold-soft); opacity: 0.92; }
