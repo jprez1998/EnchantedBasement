@@ -14,10 +14,14 @@
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
+  const AI_ON_LS = "eb-ai-on-recalc";
+
   // --- State ---------------------------------------------------------------
   let state = load() || freshState();
   let lastResult = null;       // last BayesEngine.compute(...) output
   let matchIndex = {};         // evidenceId -> [verbatim snippet, ...]
+  let aiIndex = {};            // evidenceId -> { rationale, parsimony_note, citations, direction }
+  let aiOverall = "";          // Claude's overall parsimony synthesis (last run)
 
   function freshState() {
     return {
@@ -384,6 +388,18 @@
 
     const refs = (orig.references || []).map((x) => `<li>${esc(x)}</li>`).join("");
 
+    // Claude's analysis for this criterion (if it ran).
+    const ai = aiIndex[evId];
+    const aiHtml = ai ? `
+      <h3>Claude's reasoning ✦</h3>
+      <p>${esc(ai.rationale)}</p>
+      ${ai.parsimony_note ? `<p class="parsimony-note"><strong>Parsimony:</strong> ${esc(ai.parsimony_note)}</p>` : ""}
+      ${(ai.citations && ai.citations.length) ? ai.citations.map((c) => `
+        <div class="cite"><div class="cmeta">${esc(c.source)} · verified verbatim ✓</div>
+          <blockquote>${esc(c.quote)}</blockquote></div>`).join("")
+        : `<p class="parsimony-note">Claude cited no verbatim passage from your sources for this datum.</p>`}
+    ` : "";
+
     $("#drawer-content").innerHTML = `
       <h2>${esc(orig.name)}</h2>
       <p class="sub">Viewing the <strong style="color:${h.color}">${esc(h.name)}</strong> side</p>
@@ -404,6 +420,8 @@
       <p>${esc(orig.note || "This datum's effect is determined entirely by its likelihood ratio across the hypotheses.")}
          Because P(datum | ${esc(h.short)}) = ${likH.toFixed(2)} versus an across-hypotheses average of ${mean.toFixed(2)},
          observing it ${raises ? "increases" : lowers ? "decreases" : "barely changes"} the posterior credence in ${esc(h.short)}.</p>
+
+      ${aiHtml}
 
       <h3>Editable likelihoods</h3>
       <div class="detail-stat" id="detail-edit"></div>
@@ -513,12 +531,74 @@
          is applied to the prior, so a theory needing improbable conjuncts is penalised automatically — Occam's razor
          as a Bayes factor rather than an ad-hoc fudge.</p>
 
+      ${aiOverall ? `
+      <h3>Claude's analysis ✦</h3>
+      <p>${esc(aiOverall)}</p>
+      <p class="parsimony-note">Claude proposed the likelihoods now in the table from your sources; every quote below was
+         verified as a literal substring of an uploaded source. Open a criterion to read its reasoning and citations.</p>` : ""}
+
       <h3>Optional: send to an LLM for source-grounded commentary</h3>
-      <p>The numbers above are fully deterministic. If you want narrative commentary that <em>quotes your sources</em>,
+      <p>The numbers above are deterministic arithmetic.${window.ClaudeAnalyst && window.ClaudeAnalyst.hasKey()
+        ? " Claude already ran (see above)." : " Connect Claude under ✦ AI to have it run automatically, or"}
          copy the prompt below into any LLM. It instructs the model to cite verbatim and never fabricate.</p>
       <pre id="analysis-prompt">${esc(buildAnalysisPrompt())}</pre>`;
 
     $("#report-backdrop").hidden = false;
+  }
+
+  // =========================================================================
+  // AI-augmented recalculate: optionally call Claude, then show the report
+  // =========================================================================
+  async function runClaudeAnalysis() {
+    rescanSources();
+    setProgress("Contacting Claude…", 0.1);
+    let res;
+    try {
+      res = await window.ClaudeAnalyst.analyze(state, {
+        onStatus: (m) => setProgress(m, 0.4),
+      });
+    } catch (e) {
+      hideProgress();
+      toast("Claude analysis failed — " + (e && e.message ? e.message : "unknown error"));
+      return false;
+    }
+    // Apply Claude's likelihoods to the model and capture its reasoning.
+    aiIndex = {};
+    let applied = 0, totalCites = 0;
+    res.criteria.forEach((c) => {
+      const ev = state.evidence.find((x) => x.id === c.id);
+      if (!ev) return;
+      const pR = Math.max(0.01, Math.min(0.99, +c.p_resurrection));
+      const pN = Math.max(0.01, Math.min(0.99, +c.p_naturalistic));
+      if (isFinite(pR)) ev.likelihoods[lastResult ? lastResult.pivot.proId : "R"] = pR;
+      if (isFinite(pN)) ev.likelihoods[lastResult ? lastResult.pivot.conId : "N"] = pN;
+      const verified = (c.citations || []).filter((x) => x.verified);
+      totalCites += verified.length;
+      aiIndex[c.id] = {
+        rationale: c.rationale || "",
+        parsimony_note: c.parsimony_note || "",
+        direction: c.direction || "",
+        citations: verified,
+      };
+      applied++;
+    });
+    aiOverall = res.overall || "";
+    hideProgress();
+    toast(`Claude assessed ${applied} criteria (${totalCites} verified quote${totalCites === 1 ? "" : "s"})`
+      + (res.truncated ? " — sources truncated to fit" : ""));
+    return true;
+  }
+
+  async function onRecalculate() {
+    const aiOn = aiEnabled();
+    if (aiOn && window.ClaudeAnalyst && window.ClaudeAnalyst.hasKey()) {
+      if (!state.sources.some((s) => (s.text || "").trim())) {
+        toast("Upload a source first, or turn off AI in ✦ AI settings.");
+      } else {
+        await runClaudeAnalysis();
+      }
+    }
+    openReport();
   }
 
   // =========================================================================
@@ -548,6 +628,42 @@
       <p>Every quotation in the detail drawer is a literal substring of a file you uploaded, shown with its
          character offsets. If a passage does not exist in your sources, it cannot be displayed.</p>`;
     $("#help-backdrop").hidden = false;
+  }
+
+  // =========================================================================
+  // AI settings modal
+  // =========================================================================
+  function aiEnabled() { try { return localStorage.getItem(AI_ON_LS) === "1"; } catch { return false; } }
+
+  function openSettings() {
+    const C = window.ClaudeAnalyst;
+    const sel = $("#model-select");
+    sel.innerHTML = C.MODELS.map((m) => `<option value="${m.id}">${esc(m.label)}</option>`).join("");
+    sel.value = C.getModel();
+    $("#api-key").value = C.getKey();
+    $("#ai-on-recalc").checked = aiEnabled();
+    updateKeyStatus();
+    $("#settings-backdrop").hidden = false;
+  }
+  function updateKeyStatus() {
+    const has = !!$("#api-key").value.trim();
+    $("#key-status").textContent = has
+      ? "Key present — Recalculate can call Claude."
+      : "No key — the tool runs fully offline and deterministic.";
+  }
+  function saveSettings() {
+    const C = window.ClaudeAnalyst;
+    C.setKey($("#api-key").value.trim());
+    C.setModel($("#model-select").value);
+    try { localStorage.setItem(AI_ON_LS, $("#ai-on-recalc").checked ? "1" : "0"); } catch {}
+    $("#settings-backdrop").hidden = true;
+    toast(C.hasKey() ? "AI settings saved" : "Running offline (no key)");
+  }
+  function clearKey() {
+    window.ClaudeAnalyst.setKey("");
+    $("#api-key").value = "";
+    updateKeyStatus();
+    toast("Key removed");
   }
 
   // =========================================================================
@@ -619,11 +735,19 @@
     rescanSources();
     renderAll();
 
-    $("#btn-recalculate").onclick = openReport;
+    $("#btn-recalculate").onclick = onRecalculate;
     $("#btn-add-evidence").onclick = addCriterion;
     $("#btn-help").onclick = openHelp;
     $("#btn-export").onclick = exportModel;
     $("#btn-reset").onclick = resetModel;
+
+    // AI settings
+    $("#btn-settings").onclick = openSettings;
+    $("#settings-close").onclick = () => ($("#settings-backdrop").hidden = true);
+    $("#settings-save").onclick = saveSettings;
+    $("#settings-clear").onclick = clearKey;
+    $("#api-key").oninput = updateKeyStatus;
+    $("#settings-backdrop").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.hidden = true; });
     $("#file-import").onchange = (e) => e.target.files[0] && importModel(e.target.files[0]);
 
     $("#file-sources").onchange = (e) => { addFiles(e.target.files); e.target.value = ""; };
@@ -660,6 +784,7 @@
         closeDrawer();
         $("#report-backdrop").hidden = true;
         $("#help-backdrop").hidden = true;
+        $("#settings-backdrop").hidden = true;
       }
     });
   }

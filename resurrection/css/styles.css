@@ -209,6 +209,14 @@ body {
 .swing-pos { color: #8a6d10; font-weight: 700; }
 .swing-neg { color: #2f5bb0; font-weight: 700; }
 
+.settings-row { display: flex; flex-direction: column; gap: 5px; margin: 12px 0; font-size: 0.9rem; }
+.settings-row > span { font-weight: 700; }
+.settings-row input[type=password], .settings-row select { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.settings-row.checkbox { flex-direction: row; align-items: center; gap: 9px; }
+.settings-row.checkbox input { accent-color: var(--gold); width: 18px; height: 18px; }
+.settings-row.checkbox > span { font-weight: 400; }
+.key-status { margin-top: 10px; font-size: 0.82rem; color: #6a5b44; padding: 8px 10px; background: #efe6d2; border-radius: 8px; }
+
 .site-footer { padding: 14px 22px; text-align: center; font-size: 0.78rem; color: #6a5b44; }
 
 .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: var(--wood); color: var(--parchment); padding: 10px 18px; border-radius: 10px; box-shadow: var(--shadow); z-index: 80; opacity: 0; transition: opacity .2s; }
