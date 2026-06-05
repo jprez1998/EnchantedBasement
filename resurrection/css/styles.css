@@ -150,6 +150,13 @@ body {
 .dropzone { border: 2px dashed var(--line); border-radius: 10px; padding: 14px; text-align: center; display: flex; flex-direction: column; gap: 8px; align-items: center; transition: background .15s; }
 .dropzone.drag { background: rgba(201,162,39,0.12); border-color: var(--gold); }
 .dz-hint { font-size: 0.78rem; color: #6a5b44; }
+.ocr-toggle { display: flex; align-items: flex-start; gap: 7px; margin-top: 10px; font-size: 0.84rem; cursor: pointer; line-height: 1.35; }
+.ocr-toggle input { margin-top: 2px; accent-color: var(--gold); }
+.muted-note { color: #7a6a50; font-size: 0.76rem; }
+.upload-progress { margin-top: 10px; }
+.up-label { font-size: 0.78rem; color: #5a4a32; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+.up-track { height: 8px; border-radius: 4px; background: #e8dcc4; overflow: hidden; border: 1px solid var(--line); }
+.up-fill { height: 100%; width: 0; background: var(--gold); transition: width .2s ease; }
 .paste-box { width: 100%; min-height: 60px; margin-top: 10px; font: inherit; font-size: 0.85rem; padding: 8px; border: 1px solid var(--line); border-radius: 8px; resize: vertical; }
 .source-list { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-direction: column; gap: 6px; }
 .source-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; background: rgba(255,255,255,0.7); border: 1px solid var(--line); border-radius: 8px; font-size: 0.85rem; }

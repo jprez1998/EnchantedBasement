@@ -94,55 +94,134 @@
     return "src-" + Math.random().toString(36).slice(2, 9);
   }
 
-  /** Extract a text layer from a PDF using PDF.js (loaded from CDN in index.html). */
-  function readPdf(file) {
+  const IMAGE_RE = /\.(png|jpe?g|webp|bmp|gif|tiff?)$/i;
+  // A page with fewer than this many non-space chars is treated as "no text layer".
+  const PAGE_TEXT_MIN = 12;
+
+  function readAsArrayBuffer(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onerror = () => reject(reader.error);
-      reader.onload = async () => {
-        try {
-          if (!window.pdfjsLib) {
-            return reject(new Error("PDF reader did not load (check your connection)."));
-          }
-          const data = new Uint8Array(reader.result);
-          const pdf = await window.pdfjsLib.getDocument({ data }).promise;
-          let text = "";
-          for (let p = 1; p <= pdf.numPages; p++) {
-            const page = await pdf.getPage(p);
-            const content = await page.getTextContent();
-            // Join the page's text items; insert newlines so sentences split sanely.
-            text += content.items.map((it) => it.str).join(" ") + "\n\n";
-          }
-          resolve({
-            id: newId(),
-            name: file.name,
-            text: text.trim(),
-            pages: pdf.numPages,
-            kind: "pdf",
-          });
-        } catch (e) {
-          reject(e);
-        }
-      };
+      reader.onload = () => resolve(reader.result);
       reader.readAsArrayBuffer(file);
     });
   }
 
+  // ---- OCR (Tesseract.js, loaded from CDN; created lazily and reused) -------
+  let _ocrWorker = null;
+  function getOcrWorker(onStatus) {
+    if (_ocrWorker) return _ocrWorker;
+    if (!window.Tesseract) {
+      return Promise.reject(new Error("OCR engine did not load (check your connection)."));
+    }
+    _ocrWorker = window.Tesseract.createWorker("eng", 1, {
+      logger: (m) => {
+        if (onStatus && m && typeof m.progress === "number") {
+          onStatus(m.status, m.progress);
+        }
+      },
+    });
+    return _ocrWorker;
+  }
+  async function ocrImageLike(imageOrCanvas, onStatus) {
+    const worker = await getOcrWorker(onStatus);
+    const { data } = await worker.recognize(imageOrCanvas);
+    return (data && data.text) || "";
+  }
+
+  /** Render a PDF page to a canvas sized for legible OCR (capped for memory). */
+  async function pdfPageToCanvas(page) {
+    const base = page.getViewport({ scale: 1 });
+    const scale = Math.min(3, Math.max(1, 1600 / base.width));
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    return canvas;
+  }
+
+  /**
+   * Extract text from a PDF. Always reads the embedded text layer first (fast).
+   * If `opts.ocr` is set, any page lacking a text layer is rendered and OCR'd.
+   * opts: { ocr, onProgress(msg,frac), confirmLarge(count)->bool|Promise<bool> }
+   */
+  async function readPdf(file, opts = {}) {
+    if (!window.pdfjsLib) throw new Error("PDF reader did not load (check your connection).");
+    const buf = await readAsArrayBuffer(file);
+    const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+    const total = pdf.numPages;
+    const pageText = new Array(total).fill("");
+    const needOcr = [];
+
+    for (let p = 1; p <= total; p++) {
+      if (opts.onProgress) opts.onProgress(`Reading page ${p}/${total}…`, (p - 1) / total * 0.5);
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      const t = content.items.map((it) => it.str).join(" ").trim();
+      pageText[p - 1] = t;
+      if (t.replace(/\s/g, "").length < PAGE_TEXT_MIN) needOcr.push(p);
+    }
+
+    let ocredPages = 0;
+    if (opts.ocr && needOcr.length) {
+      let proceed = true;
+      if (needOcr.length > 25 && typeof opts.confirmLarge === "function") {
+        proceed = await opts.confirmLarge(needOcr.length);
+      }
+      if (proceed) {
+        for (let i = 0; i < needOcr.length; i++) {
+          const p = needOcr[i];
+          const frac = 0.5 + (i / needOcr.length) * 0.5;
+          if (opts.onProgress) opts.onProgress(`OCR page ${p} (${i + 1}/${needOcr.length})…`, frac);
+          const page = await pdf.getPage(p);
+          const canvas = await pdfPageToCanvas(page);
+          try {
+            const t = (await ocrImageLike(canvas, (st, pr) => {
+              if (opts.onProgress && st === "recognizing text") {
+                opts.onProgress(`OCR page ${p} (${i + 1}/${needOcr.length}) ${Math.round(pr * 100)}%`, frac);
+              }
+            })).trim();
+            if (t) { pageText[p - 1] = t; ocredPages++; }
+          } finally {
+            canvas.width = canvas.height = 0; // free memory on mobile
+          }
+        }
+      }
+    }
+
+    return {
+      id: newId(),
+      name: file.name,
+      text: pageText.join("\n\n").trim(),
+      pages: total,
+      ocredPages,
+      kind: "pdf",
+    };
+  }
+
+  /** OCR a single image file into a source record. */
+  async function readImage(file, opts = {}) {
+    if (opts.onProgress) opts.onProgress("OCR image…", 0.1);
+    const text = (await ocrImageLike(file, (st, pr) => {
+      if (opts.onProgress && st === "recognizing text") {
+        opts.onProgress(`OCR image ${Math.round(pr * 100)}%`, 0.1 + pr * 0.9);
+      }
+    })).trim();
+    return { id: newId(), name: file.name, text, kind: "image" };
+  }
+
   /** Read an uploaded File into a {id,name,text} source record. */
-  function readFile(file) {
+  function readFile(file, opts = {}) {
     const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
-    if (isPdf) return readPdf(file);
+    if (isPdf) return readPdf(file, opts);
+    const isImage = (file.type && file.type.startsWith("image/")) || IMAGE_RE.test(file.name);
+    if (isImage) return readImage(file, opts);
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onerror = () => reject(reader.error);
-      reader.onload = () => {
-        resolve({
-          id: newId(),
-          name: file.name,
-          text: String(reader.result || ""),
-          kind: "text",
-        });
-      };
+      reader.onload = () => resolve({ id: newId(), name: file.name, text: String(reader.result || ""), kind: "text" });
       reader.readAsText(file);
     });
   }

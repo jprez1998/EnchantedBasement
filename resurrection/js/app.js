@@ -33,7 +33,23 @@
     } catch { return null; }
   }
   function persist() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch {}
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(state));
+    } catch {
+      // A whole book can exceed the ~5MB localStorage quota. Save the model and
+      // light source metadata so edits/priors survive; large texts stay in
+      // memory only (re-upload after a reload). Better than saving nothing.
+      try {
+        const slim = {
+          ...state,
+          sources: state.sources.map((s) =>
+            (s.text || "").length > 50000
+              ? { id: s.id, name: s.name, kind: s.kind, pages: s.pages, text: "", _dropped: true }
+              : s),
+        };
+        localStorage.setItem(LS_KEY, JSON.stringify(slim));
+      } catch {}
+    }
   }
 
   // --- Helpers -------------------------------------------------------------
@@ -243,11 +259,17 @@
     ul.innerHTML = "";
     state.sources.forEach((s) => {
       const li = document.createElement("li");
-      const words = (s.text.trim().match(/\S+/g) || []).length;
+      const words = ((s.text || "").trim().match(/\S+/g) || []).length;
+      const bits = [`${words.toLocaleString()} words`];
+      if (s.pages) bits.push(`${s.pages}p`);
+      if (s.ocredPages) bits.push(`${s.ocredPages} OCR'd`);
+      else if (s.kind === "image") bits.push("OCR");
+      else if (s.kind === "pdf") bits.push("PDF");
+      if (s._dropped) bits.push("in memory only — re-upload after reload");
       li.innerHTML = `
         <span>
           <span class="sname">${esc(s.name)}</span>
-          <span class="smeta">${words.toLocaleString()} words</span>
+          <span class="smeta">${bits.join(" · ")}</span>
         </span>
         <button class="btn danger" data-srcrem="${s.id}">remove</button>`;
       ul.appendChild(li);
@@ -265,29 +287,55 @@
     matchIndex = window.SourceMatcher.scanAll(state.evidence, state.sources);
   }
 
+  // --- Upload progress UI --------------------------------------------------
+  function setProgress(label, frac) {
+    const box = $("#upload-progress");
+    if (!box) return;
+    box.hidden = false;
+    $("#up-label").textContent = label;
+    $("#up-fill").style.width = Math.max(0, Math.min(1, frac || 0)) * 100 + "%";
+  }
+  function hideProgress() { const b = $("#upload-progress"); if (b) b.hidden = true; }
+
   async function addFiles(fileList) {
     const files = Array.from(fileList || []);
     if (!files.length) return;
-    const isPdf = (f) => f.type === "application/pdf" || /\.pdf$/i.test(f.name);
-    if (files.some(isPdf)) toast("Reading PDF…");
-    let added = 0;
+    const ocr = !!($("#ocr-toggle") && $("#ocr-toggle").checked);
+    const opts = {
+      ocr,
+      onProgress: (msg, frac) => setProgress(msg, frac),
+      confirmLarge: (n) => confirm(
+        `This PDF has ${n} page(s) with no text layer. OCR-ing them runs in your ` +
+        `browser and can take a while (roughly ${n}–${n * 3}s) and a lot of memory. ` +
+        `Continue?`),
+    };
+
+    let added = 0, suggestedOcr = false;
     for (const f of files) {
       try {
-        const rec = await window.SourceMatcher.readFile(f);
+        setProgress(`Opening ${f.name}…`, 0.02);
+        const rec = await window.SourceMatcher.readFile(f, opts);
         if (!rec.text || !rec.text.trim()) {
-          // A PDF with no text layer (e.g. a scan/photo) yields nothing to quote.
-          toast(rec.kind === "pdf"
-            ? `“${f.name}” has no selectable text (looks scanned). Citations need a text layer.`
-            : `“${f.name}” is empty.`);
+          if ((rec.kind === "pdf" || rec.kind === "image") && !ocr) {
+            suggestedOcr = true;
+            toast(`“${f.name}” has no selectable text — tick OCR and re-upload to read it.`);
+          } else {
+            toast(`“${f.name}” produced no readable text.`);
+          }
           continue;
         }
         state.sources.push(rec);
         added++;
+        if (rec.ocredPages) toast(`OCR read ${rec.ocredPages} page(s) of “${f.name}”.`);
       } catch (e) {
         toast("Could not read " + f.name + (e && e.message ? " — " + e.message : ""));
       }
     }
-    if (!added) return;
+    hideProgress();
+    if (!added) {
+      if (suggestedOcr) toast("Tip: enable OCR for scanned documents.");
+      return;
+    }
     rescanSources();
     renderSources();
     recompute();
