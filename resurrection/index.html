@@ -6,7 +6,7 @@
   <title>Enchanted Basement · Resurrection Bayes Table</title>
   <meta name="description" content="An interactive Bayesian model-comparison tool for assessing the historical plausibility of the death, burial, and resurrection of Jesus." />
   <link rel="icon" type="image/png" href="Small Logo.png" />
-  <link rel="stylesheet" href="css/styles.css?v=2" />
+  <link rel="stylesheet" href="css/styles.css?v=3" />
 </head>
 <body>
   <header class="site-header">
@@ -85,12 +85,13 @@
         <span class="src-count" id="src-count">0 loaded</span>
       </div>
       <p class="hint">
-        Upload as many sources as you like (.txt, .md, .json, .csv). Citations are
+        Upload as many sources as you like (PDF, .txt, .md, .json, .csv). Citations are
         extracted <strong>verbatim</strong> — the tool never invents a quotation.
+        PDFs are read in your browser; a scanned PDF with no text layer can't be quoted.
       </p>
       <div id="dropzone" class="dropzone">
         <label class="btn small">
-          Upload sources<input id="file-sources" type="file" multiple accept=".txt,.md,.markdown,.json,.csv,text/plain" hidden />
+          Upload sources<input id="file-sources" type="file" multiple accept=".pdf,application/pdf,.txt,.md,.markdown,.json,.csv,text/plain" hidden />
         </label>
         <span class="dz-hint">or drag &amp; drop files here</span>
       </div>
@@ -137,9 +138,10 @@
     <span>Enchanted Basement · A transparent Bayesian instrument. All numbers are editable priors, not assertions of fact.</span>
   </footer>
 
-  <script src="js/bayes.js?v=2"></script>
-  <script src="js/criteria.js?v=2"></script>
-  <script src="js/sources.js?v=2"></script>
-  <script src="js/app.js?v=2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="js/bayes.js?v=3"></script>
+  <script src="js/criteria.js?v=3"></script>
+  <script src="js/sources.js?v=3"></script>
+  <script src="js/app.js?v=3"></script>
 </body>
 </html>

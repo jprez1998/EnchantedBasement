@@ -90,16 +90,57 @@
     return out;
   }
 
-  /** Read an uploaded File into a {id,name,text} source record (text formats). */
+  function newId() {
+    return "src-" + Math.random().toString(36).slice(2, 9);
+  }
+
+  /** Extract a text layer from a PDF using PDF.js (loaded from CDN in index.html). */
+  function readPdf(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error);
+      reader.onload = async () => {
+        try {
+          if (!window.pdfjsLib) {
+            return reject(new Error("PDF reader did not load (check your connection)."));
+          }
+          const data = new Uint8Array(reader.result);
+          const pdf = await window.pdfjsLib.getDocument({ data }).promise;
+          let text = "";
+          for (let p = 1; p <= pdf.numPages; p++) {
+            const page = await pdf.getPage(p);
+            const content = await page.getTextContent();
+            // Join the page's text items; insert newlines so sentences split sanely.
+            text += content.items.map((it) => it.str).join(" ") + "\n\n";
+          }
+          resolve({
+            id: newId(),
+            name: file.name,
+            text: text.trim(),
+            pages: pdf.numPages,
+            kind: "pdf",
+          });
+        } catch (e) {
+          reject(e);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  /** Read an uploaded File into a {id,name,text} source record. */
   function readFile(file) {
+    const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+    if (isPdf) return readPdf(file);
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onerror = () => reject(reader.error);
       reader.onload = () => {
         resolve({
-          id: "src-" + Math.random().toString(36).slice(2, 9),
+          id: newId(),
           name: file.name,
           text: String(reader.result || ""),
+          kind: "text",
         });
       };
       reader.readAsText(file);

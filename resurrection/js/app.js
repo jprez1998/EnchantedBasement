@@ -268,16 +268,30 @@
   async function addFiles(fileList) {
     const files = Array.from(fileList || []);
     if (!files.length) return;
+    const isPdf = (f) => f.type === "application/pdf" || /\.pdf$/i.test(f.name);
+    if (files.some(isPdf)) toast("Reading PDF…");
+    let added = 0;
     for (const f of files) {
       try {
         const rec = await window.SourceMatcher.readFile(f);
+        if (!rec.text || !rec.text.trim()) {
+          // A PDF with no text layer (e.g. a scan/photo) yields nothing to quote.
+          toast(rec.kind === "pdf"
+            ? `“${f.name}” has no selectable text (looks scanned). Citations need a text layer.`
+            : `“${f.name}” is empty.`);
+          continue;
+        }
         state.sources.push(rec);
-      } catch { toast("Could not read " + f.name); }
+        added++;
+      } catch (e) {
+        toast("Could not read " + f.name + (e && e.message ? " — " + e.message : ""));
+      }
     }
+    if (!added) return;
     rescanSources();
     renderSources();
     recompute();
-    toast(files.length + " source(s) added");
+    toast(added + " source(s) added");
   }
 
   // =========================================================================
@@ -549,6 +563,11 @@
   }
 
   function boot() {
+    // Point PDF.js at its worker (same CDN/version as the library in index.html).
+    if (window.pdfjsLib) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    }
     rescanSources();
     renderAll();
 
