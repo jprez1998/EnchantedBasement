@@ -1,0 +1,131 @@
+.player-panel {
+  flex: 1;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+
+.player-panel.active {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 16px rgba(201,162,39,0.2), inset 0 1px 0 rgba(201,162,39,0.1);
+}
+
+.player-panel.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent-gold), transparent);
+}
+
+.active-indicator {
+  font-size: 10px;
+  font-family: 'Cinzel', serif;
+  color: var(--accent-gold);
+  letter-spacing: 0.05em;
+  margin-bottom: -4px;
+}
+
+.player-name {
+  font-family: 'Cinzel', serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Crimson Text', serif;
+  font-weight: 600;
+}
+
+.badge.qm {
+  background: rgba(201,162,39,0.2);
+  color: var(--accent-gold-light);
+  border: 1px solid rgba(201,162,39,0.3);
+}
+
+.badge.mate {
+  background: rgba(124,58,237,0.2);
+  color: var(--accent-purple-light);
+  border: 1px solid rgba(124,58,237,0.3);
+}
+
+.player-stats {
+  display: flex;
+  gap: 12px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.stat-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: 'Cinzel', serif;
+}
+
+.stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-family: 'Cinzel', serif;
+}
+
+.stat-value.sips {
+  color: #60a5fa;
+}
+
+.stat-value.score {
+  color: var(--accent-gold-light);
+}
+
+.composure-bar-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.composure-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-family: 'Cinzel', serif;
+  letter-spacing: 0.05em;
+}
+
+.composure-bar {
+  height: 6px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.composure-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease, background 0.4s;
+  box-shadow: 0 0 6px currentColor;
+}

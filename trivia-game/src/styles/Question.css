@@ -1,0 +1,302 @@
+.question-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px 0 8px;
+  position: relative;
+  animation: fade-up 0.3s ease;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Full-screen flash on reveal */
+.question-screen.flash-correct::after,
+.question-screen.flash-wrong::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  animation: flash 0.6s ease-out forwards;
+}
+
+.question-screen.flash-correct::after {
+  background: radial-gradient(circle at center, rgba(34,197,94,0.35), transparent 70%);
+}
+
+.question-screen.flash-wrong::after {
+  background: radial-gradient(circle at center, rgba(239,68,68,0.4), transparent 70%);
+}
+
+@keyframes flash {
+  0% { opacity: 0; }
+  25% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.question-screen.flash-wrong {
+  animation: shake-screen 0.5s ease;
+}
+
+@keyframes shake-screen {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-5px); }
+  80% { transform: translateX(5px); }
+}
+
+/* Meta row */
+.question-top {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.q-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.q-diff {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--diff-color);
+  background: color-mix(in srgb, var(--diff-color) 18%, transparent);
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.q-cat {
+  font-size: 13px;
+  color: var(--ink-soft);
+  background: rgba(255,255,255,0.06);
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.q-points {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.q-player {
+  font-size: 13px;
+  color: var(--ink-mute);
+  font-weight: 600;
+}
+
+/* Mystery banner */
+.mystery-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.mystery-pulse {
+  font-family: 'Fredoka', sans-serif;
+  font-weight: 700;
+  font-size: 17px;
+  background: linear-gradient(90deg, #f472b6, #a855f7, #38bdf8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: mystery-glow 1.4s ease-in-out infinite;
+}
+
+@keyframes mystery-glow {
+  0%, 100% { filter: brightness(1); transform: scale(1); }
+  50% { filter: brightness(1.3); transform: scale(1.05); }
+}
+
+.mystery-cat {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  background: rgba(168,85,247,0.2);
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+/* Question text box */
+.question-box {
+  background: var(--bg-card);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: var(--radius);
+  padding: 22px 20px;
+  text-align: center;
+}
+
+.question-box.mystery-box {
+  border: 1px solid rgba(168,85,247,0.4);
+  background: linear-gradient(135deg, rgba(168,85,247,0.12), rgba(56,189,248,0.08));
+}
+
+.question-text {
+  font-size: 20px;
+  font-weight: 600;
+  font-family: 'Fredoka', sans-serif;
+  line-height: 1.35;
+}
+
+/* Options */
+.options-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  background: var(--bg-card);
+  border: 2px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius-sm);
+  padding: 15px 16px;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 500;
+  text-align: left;
+  width: 100%;
+  position: relative;
+}
+
+.option:not(:disabled):hover {
+  border-color: var(--brand-2);
+  background: var(--bg-card-2);
+  transform: translateX(3px);
+}
+
+.option-letter {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.08);
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.option-text { flex: 1; }
+
+.option-mark {
+  font-size: 20px;
+  font-weight: 700;
+  margin-left: auto;
+}
+
+/* Reveal states */
+.option.reveal-correct {
+  border-color: var(--good);
+  background: rgba(34,197,94,0.18);
+  color: #bbf7d0;
+  animation: pop-correct 0.5s ease;
+}
+
+.option.reveal-correct .option-letter {
+  background: var(--good);
+  color: #052e16;
+}
+
+@keyframes pop-correct {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.05); box-shadow: 0 0 0 4px rgba(34,197,94,0.3); }
+  100% { transform: scale(1); }
+}
+
+.option.reveal-wrong {
+  border-color: var(--bad);
+  background: rgba(239,68,68,0.18);
+  color: #fecaca;
+  animation: shake-option 0.45s ease;
+}
+
+.option.reveal-wrong .option-letter {
+  background: var(--bad);
+  color: #450a0a;
+}
+
+@keyframes shake-option {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-7px); }
+  50% { transform: translateX(7px); }
+  75% { transform: translateX(-4px); }
+}
+
+.option.faded {
+  opacity: 0.4;
+}
+
+/* Result banner */
+.result-banner {
+  margin-top: 4px;
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  animation: slide-up-banner 0.35s ease;
+}
+
+@keyframes slide-up-banner {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.result-banner.good {
+  background: linear-gradient(135deg, rgba(34,197,94,0.25), rgba(34,197,94,0.1));
+  border: 1px solid rgba(34,197,94,0.4);
+}
+
+.result-banner.bad {
+  background: linear-gradient(135deg, rgba(239,68,68,0.25), rgba(239,68,68,0.1));
+  border: 1px solid rgba(239,68,68,0.4);
+}
+
+.rb-title {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.result-banner.good .rb-title { color: #4ade80; }
+.result-banner.bad .rb-title { color: #f87171; }
+
+.rb-sub {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.next-btn {
+  margin-top: 12px;
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  color: white;
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+  font-weight: 700;
+  font-family: 'Fredoka', sans-serif;
+  box-shadow: 0 6px 18px rgba(99,102,241,0.4);
+}
+
+.next-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 9px 24px rgba(99,102,241,0.55);
+}

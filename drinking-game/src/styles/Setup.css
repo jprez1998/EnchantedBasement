@@ -1,0 +1,164 @@
+.setup-screen {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 24px 20px 32px;
+  position: relative;
+  overflow-y: auto;
+}
+
+.setup-glow {
+  position: fixed;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, var(--glow-purple) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.setup-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 390px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.setup-icon {
+  font-size: 56px;
+  filter: drop-shadow(0 0 20px var(--accent-gold));
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.setup-title {
+  font-size: 36px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--accent-gold-light);
+  text-shadow: 0 0 30px var(--glow-gold);
+  line-height: 1.15;
+}
+
+.setup-subtitle {
+  color: var(--text-secondary);
+  font-style: italic;
+  font-size: 17px;
+  margin-top: -8px;
+}
+
+.setup-players {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.player-input-group {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.player-input-group label {
+  font-family: 'Cinzel', serif;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: var(--accent-gold);
+  text-transform: uppercase;
+  padding-left: 4px;
+}
+
+.player-input-group input {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  color: var(--text-primary);
+  font-size: 17px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.player-input-group input:focus {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 0 2px rgba(201,162,39,0.15);
+}
+
+.player-input-group input::placeholder {
+  color: var(--text-muted);
+}
+
+.vs-divider {
+  font-family: 'Cinzel', serif;
+  font-size: 14px;
+  color: var(--accent-purple-light);
+  letter-spacing: 0.2em;
+  padding: 2px 0;
+}
+
+.setup-rules {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+
+.setup-rules h3 {
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  color: var(--accent-gold);
+  margin-bottom: 10px;
+}
+
+.setup-rules ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setup-rules li {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.start-btn {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, var(--accent-gold), #a07820);
+  color: var(--bg-deep);
+  font-size: 17px;
+  font-weight: 700;
+  border-radius: var(--radius);
+  letter-spacing: 0.08em;
+  box-shadow: 0 4px 20px var(--glow-gold);
+}
+
+.start-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 28px var(--glow-gold);
+}
+
+.disclaimer {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}

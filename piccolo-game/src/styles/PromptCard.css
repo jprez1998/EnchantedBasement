@@ -1,0 +1,184 @@
+.game-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 16px 24px;
+  gap: 16px;
+}
+
+.game-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.player-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.player-badge {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(255,255,255,0.06);
+  color: var(--ink-mute);
+  border: 1px solid transparent;
+  transition: all 0.25s;
+}
+
+.player-badge.active {
+  background: rgba(255,255,255,0.12);
+  color: var(--pc);
+  border-color: var(--pc);
+  transform: scale(1.06);
+}
+
+.end-btn {
+  padding: 8px 16px;
+  background: rgba(255,255,255,0.07);
+  color: var(--ink-mute);
+  border-radius: 10px;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.card-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 3D flip card */
+.prompt-card {
+  width: 100%;
+  max-width: 360px;
+  aspect-ratio: 3 / 4;
+  perspective: 900px;
+  cursor: pointer;
+}
+
+.prompt-card .card-face {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 28px 24px;
+  transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.prompt-card {
+  position: relative;
+}
+
+.card-back {
+  background: var(--bg-card);
+  border: 2px solid rgba(255,255,255,0.1);
+  transform: rotateY(0deg);
+}
+
+.card-front {
+  background: linear-gradient(145deg, rgba(255,255,255,0.06), var(--bg-card));
+  border: 2px solid var(--type-color);
+  transform: rotateY(180deg);
+  box-shadow: 0 0 40px color-mix(in srgb, var(--type-color) 30%, transparent);
+}
+
+.prompt-card.flipped .card-back {
+  transform: rotateY(-180deg);
+}
+
+.prompt-card.flipped .card-front {
+  transform: rotateY(0deg);
+}
+
+.card-back-icon {
+  font-size: 64px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.card-back-label {
+  font-size: 18px;
+  color: var(--ink-soft);
+  text-align: center;
+  line-height: 1.5;
+}
+
+.flip-btn {
+  margin-top: 12px;
+  padding: 14px 40px;
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  color: white;
+  border-radius: var(--radius-sm);
+  font-size: 18px;
+  font-weight: 700;
+  font-family: 'Fredoka', sans-serif;
+  box-shadow: 0 6px 20px rgba(139,92,246,0.45);
+}
+
+.type-badge {
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: var(--type-color);
+  color: white;
+  align-self: center;
+}
+
+.card-emoji {
+  font-size: 56px;
+}
+
+.card-text {
+  font-size: 17px;
+  line-height: 1.55;
+  text-align: center;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.card-player-tag {
+  font-size: 14px;
+  font-weight: 700;
+  margin-top: -4px;
+}
+
+.next-btn {
+  margin-top: 10px;
+  padding: 13px 36px;
+  background: rgba(255,255,255,0.1);
+  color: var(--ink);
+  border-radius: var(--radius-sm);
+  font-size: 17px;
+  font-weight: 700;
+  font-family: 'Fredoka', sans-serif;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+.next-btn:active {
+  background: rgba(255,255,255,0.18);
+}
+
+.round-counter {
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-mute);
+}

@@ -1,0 +1,124 @@
+.end-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 20px;
+  position: relative;
+}
+
+.end-content {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  z-index: 1;
+}
+
+.end-icon {
+  font-size: 64px;
+  animation: bob 2.4s ease-in-out infinite;
+}
+
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.end-title {
+  font-size: 32px;
+  text-align: center;
+  background: linear-gradient(90deg, var(--gold), var(--brand-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1.1;
+}
+
+.end-sub {
+  color: var(--ink-soft);
+  font-size: 15px;
+  text-align: center;
+  margin-top: -6px;
+}
+
+.end-drunkest {
+  font-size: 14px;
+  color: var(--ink-soft);
+  background: rgba(255,255,255,0.06);
+  padding: 6px 14px;
+  border-radius: 20px;
+}
+
+.end-drunkest b { color: var(--gold); }
+
+.final-board {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.final-row {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+
+.final-row.champ {
+  border-color: var(--gold);
+  background: linear-gradient(135deg, rgba(251,191,36,0.18), rgba(251,191,36,0.05));
+}
+
+.fr-rank { font-size: 18px; font-weight: 700; text-align: center; }
+.fr-name { font-weight: 600; font-size: 16px; }
+.fr-score { font-weight: 700; color: var(--gold); font-size: 15px; }
+
+.fr-drinks {
+  grid-column: 2 / 4;
+  font-size: 12px;
+  color: var(--ink-mute);
+}
+
+.end-actions {
+  width: 100%;
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.play-again-btn, .new-players-btn {
+  flex: 1;
+  padding: 15px;
+  border-radius: var(--radius);
+  font-size: 15px;
+  font-weight: 700;
+  font-family: 'Fredoka', sans-serif;
+}
+
+.play-again-btn {
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  color: white;
+  box-shadow: 0 6px 18px rgba(99,102,241,0.4);
+}
+
+.new-players-btn {
+  background: rgba(255,255,255,0.08);
+  color: var(--ink-soft);
+}
+
+.disclaimer {
+  font-size: 12px;
+  color: var(--ink-mute);
+  text-align: center;
+  margin-top: 4px;
+}
