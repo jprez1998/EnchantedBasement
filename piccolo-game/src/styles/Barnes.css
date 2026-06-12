@@ -10,13 +10,14 @@
   touch-action: manipulation;
 }
 
-/* Pulsing bg glow */
+/* Pulsing bg glow — pointer-events: none so it doesn't block child button clicks */
 .barnes-overlay::before {
   content: '';
   position: absolute;
   inset: 0;
   background: radial-gradient(circle at 50% 50%, rgba(239,68,68,0.25) 0%, transparent 70%);
   animation: bg-pulse 0.8s ease-in-out infinite;
+  pointer-events: none;
 }
 
 @keyframes bg-pulse {
@@ -163,6 +164,8 @@
 .overlay-failed { background: #0d0304; }
 
 .barnes-result {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
