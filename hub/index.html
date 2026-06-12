@@ -54,6 +54,7 @@
       .game-card:active { transform: scale(0.97); }
       .game-card.cards:hover { border-color: #c9a227; box-shadow: 0 12px 32px rgba(201,162,39,0.3); transform: translateY(-3px); }
       .game-card.trivia:hover { border-color: #8b5cf6; box-shadow: 0 12px 32px rgba(139,92,246,0.35); transform: translateY(-3px); }
+      .game-card.piccolo:hover { border-color: #ec4899; box-shadow: 0 12px 32px rgba(236,72,153,0.35); transform: translateY(-3px); }
       .gc-icon { font-size: 44px; flex-shrink: 0; }
       .gc-text { display: flex; flex-direction: column; gap: 3px; }
       .gc-title { font-family: 'Cinzel', serif; font-size: 20px; font-weight: 700; }
@@ -66,7 +67,7 @@
     <div class="wrap">
       <div class="logo">🍻</div>
       <h1>Enchanted Basement</h1>
-      <p class="tagline">Two ways to lose your composure. Pick your game.</p>
+      <p class="tagline">Three ways to lose your composure. Pick your game.</p>
 
       <div class="games">
         <a class="game-card cards" href="./cards/">
@@ -83,6 +84,15 @@
           <span class="gc-text">
             <span class="gc-title">Brain &amp; Booze</span>
             <span class="gc-desc">Multiplayer trivia. Easy/medium/hard questions, drink when you're wrong, mystery rounds let you dish out shots.</span>
+          </span>
+          <span class="gc-arrow">›</span>
+        </a>
+
+        <a class="game-card piccolo" href="./piccolo/">
+          <span class="gc-icon">🎯</span>
+          <span class="gc-text">
+            <span class="gc-title">Piccolo</span>
+            <span class="gc-desc">3-player chaos. Dares, rules, hot seats — and watch out for the OI BARNES BUFFALO interrupt...</span>
           </span>
           <span class="gc-arrow">›</span>
         </a>
