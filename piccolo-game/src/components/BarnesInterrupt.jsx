@@ -1,11 +1,9 @@
 import { useEffect, useRef } from 'react';
 import '../styles/Barnes.css';
 
-const TAPS_NEEDED = 10;
-
 export default function BarnesInterrupt({
   barnesTaps, barnesTimeLeft, barnesResult, TAPS_NEEDED: tapsNeeded,
-  onTap, onDismiss, players,
+  onTap, onDismiss,
 }) {
   const totalMs = 5000;
   const pct = Math.max(0, (barnesTimeLeft / totalMs) * 100);
@@ -18,11 +16,21 @@ export default function BarnesInterrupt({
     }
   }, [barnesResult]);
 
+  // Single handler for the whole overlay — tap to save OR tap to dismiss
+  function handleOverlayTap(e) {
+    e.preventDefault();
+    if (barnesResult !== null) {
+      onDismiss();
+    } else {
+      onTap();
+    }
+  }
+
   return (
     <div
       className={`barnes-overlay ${barnesResult === 'saved' ? 'overlay-saved' : ''} ${barnesResult === 'failed' ? 'overlay-failed' : ''}`}
-      onTouchStart={barnesResult === null ? onTap : undefined}
-      onClick={barnesResult === null ? onTap : undefined}
+      onTouchStart={handleOverlayTap}
+      onClick={handleOverlayTap}
     >
       {barnesResult === null && (
         <>
@@ -57,7 +65,7 @@ export default function BarnesInterrupt({
           <div className="result-icon">🦸</div>
           <h2>SAVED!</h2>
           <p>Barnes escapes... this time.</p>
-          <button className="dismiss-btn" onClick={onDismiss}>Continue Game</button>
+          <p className="tap-to-continue">tap anywhere to continue</p>
         </div>
       )}
 
@@ -66,7 +74,7 @@ export default function BarnesInterrupt({
           <div className="result-icon">💀</div>
           <h2>TOO SLOW, BARNES</h2>
           <p className="penalty-text">Take 3 sips you buffalo</p>
-          <button className="dismiss-btn dismiss-fail" onClick={onDismiss}>Done drinking</button>
+          <p className="tap-to-continue">tap anywhere to continue</p>
         </div>
       )}
     </div>
