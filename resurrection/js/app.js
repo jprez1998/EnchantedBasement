@@ -897,6 +897,18 @@
   // =========================================================================
   async function runClaudeAnalysis() {
     rescanSources();
+    // Warn before a multi-pass (map-reduce) run, since each pass is a billed call.
+    const srcs = state.sources.filter((s) => (s.text || "").trim());
+    const totalChars = srcs.reduce((a, s) => a + (s.text || "").length, 0);
+    if (srcs.length > 6 || totalChars > 500000) {
+      const passes = Math.max(1, Math.ceil(totalChars / 200000)) + 1;
+      if (!confirm(
+        `${srcs.length} sources (${Math.round(totalChars / 1000)}k chars) will be read in multiple passes — ` +
+        `about ${passes} Claude calls on your account, reading every source in full (no truncation), then one ` +
+        `final scoring pass. Continue?`)) {
+        return false;
+      }
+    }
     setProgress("Contacting Claude…", 0.1);
     let res;
     try {
@@ -940,8 +952,10 @@
     });
     aiOverall = res.overall || "";
     hideProgress();
-    toast(`Claude assessed ${applied} criteria · ${totalDP} data point${totalDP === 1 ? "" : "s"} read, ${countedDP} counted`
-      + (res.truncated ? " — sources truncated to fit" : ""));
+    const modeNote = res.mode === "map-reduce"
+      ? ` — read ${res.sourcesRead} sources in ${res.calls} passes`
+      : (res.truncated ? " — sources truncated to fit" : "");
+    toast(`Claude assessed ${applied} criteria · ${totalDP} data point${totalDP === 1 ? "" : "s"}, ${countedDP} counted` + modeNote);
     return true;
   }
 

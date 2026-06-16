@@ -172,81 +172,210 @@
     return lines.join("\n");
   }
 
-  /** Run the analysis. opts: { onStatus(msg) }. Returns structured result or throws. */
-  async function analyze(state, opts = {}) {
-    const key = getKey();
-    if (!key) throw new Error("No API key set. Add one in Settings.");
-    const model = getModel();
-    const sources = (state.sources || []).filter((s) => (s.text || "").trim());
-    if (!sources.length) throw new Error("Upload at least one source first.");
+  // Just the criterion list (ids + names) — used in the extraction (map) phase.
+  function buildCriteriaList(state) {
+    return "CRITERIA (use the exact id):\n" +
+      state.evidence.map((e) => `- id="${e.id}" — ${e.name}: ${e.description || ""}`).join("\n");
+  }
 
-    const { text: sourcesText, truncated } = buildSourcesText(sources);
-    if (opts.onStatus) opts.onStatus("Asking Claude to read and assess the sources…");
+  // ---- Map-reduce machinery (for many / large sources) ---------------------
+  const SINGLE_CALL_CHARS = 500000;  // ≤ this and few sources → one call
+  const SINGLE_CALL_SOURCES = 6;
+  const BATCH_CHARS = 200000;        // ~50k tokens of source text per extract call
+  const PER_CRITERION_CAP = 10;      // consolidated data points kept per criterion
 
-    const body = {
-      model,
-      max_tokens: 16000,
-      system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-      tools: [TOOL],
-      tool_choice: { type: "tool", name: "submit_assessment" },
-      messages: [{
-        role: "user",
-        content: [
-          { type: "text", text: "SOURCES (verbatim):\n" + sourcesText, cache_control: { type: "ephemeral" } },
-          { type: "text", text: buildCriteriaText(state) },
-        ],
-      }],
+  const EXTRACT_SYSTEM =
+    "You are a historian doing SOURCE EXTRACTION. From the supplied source text only, extract — per " +
+    "criterion — the distinct data points the author(s) actually use. For EACH: quote VERBATIM (an exact " +
+    "substring) and name the source; classify provenance (quoted_source / historical_reference / " +
+    "author_inference / author_opinion); capture why it is raised and the author's own assessment and " +
+    "surrounding context; run the critical-fallacy check (ad_hoc / circular / unfalsifiable / special_pleading " +
+    "/ argument_from_silence / anachronism / none); and say which hypothesis it bears on (supports: R / N / " +
+    "neither). DO NOT set probabilities or final likelihoods — this is extraction only. If a source does not " +
+    "address a criterion, omit it. Quote everything VERBATIM and invent nothing.";
+
+  const EXTRACT_TOOL = {
+    name: "extract_evidence",
+    description: "Per criterion, the verbatim data points the supplied source uses. No likelihoods.",
+    input_schema: {
+      type: "object",
+      properties: {
+        criteria: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { id: { type: "string" }, data_points: { type: "array", items: DP } },
+            required: ["id", "data_points"],
+          },
+        },
+      },
+      required: ["criteria"],
+    },
+  };
+
+  function callBody(model, system, tools, toolName, content, maxTokens) {
+    return {
+      model, max_tokens: maxTokens,
+      system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+      tools, tool_choice: { type: "tool", name: toolName },
+      messages: [{ role: "user", content }],
     };
+  }
 
+  async function callTool(body, toolName) {
     const resp = await fetch(ENDPOINT, {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-api-key": key,
+        "x-api-key": getKey(),
         "anthropic-version": "2023-06-01",
         "anthropic-dangerous-direct-browser-access": "true",
       },
       body: JSON.stringify(body),
     });
-
     if (!resp.ok) {
-      let detail = "";
-      try { detail = (await resp.json())?.error?.message || ""; } catch {}
+      let detail = ""; try { detail = (await resp.json())?.error?.message || ""; } catch {}
       if (resp.status === 401) throw new Error("Invalid API key (401).");
       if (resp.status === 429) throw new Error("Rate limited (429) — wait and retry.");
       throw new Error(`Anthropic API error ${resp.status}${detail ? ": " + detail : ""}`);
     }
-
     const data = await resp.json();
-    if (data.stop_reason === "max_tokens") {
-      throw new Error("Response hit the length limit — try fewer/shorter sources or Sonnet/Haiku.");
-    }
-    const toolBlock = (data.content || []).find((b) => b.type === "tool_use" && b.name === TOOL.name);
-    if (!toolBlock || !toolBlock.input) throw new Error("Claude did not return a structured assessment.");
-    const result = toolBlock.input;
+    if (data.stop_reason === "max_tokens") throw new Error("A response hit the length limit — try Sonnet/Haiku or fewer sources.");
+    const block = (data.content || []).find((b) => b.type === "tool_use" && b.name === toolName);
+    if (!block || !block.input) throw new Error("Claude did not return a structured result.");
+    return { input: block.input, usage: data.usage || {} };
+  }
 
-    // --- Verify every quote against the uploaded text (no hallucinations) ---
+  function makeVerifier(sources) {
     const haystacks = sources.map((s) => ({ name: s.name, norm: normalize(s.text) }));
-    const verify = (q) => {
+    return (q) => {
       const nq = normalize(q);
       if (nq.length < 8) return null;
       const hit = haystacks.find((h) => h.norm.includes(nq));
       return hit ? hit.name : null;
     };
-    (result.criteria || []).forEach((c) => {
-      c.data_points = (c.data_points || []).map((dp) => {
-        const verifiedIn = verify(dp.quote);
-        return {
-          ...dp,
-          verified: !!verifiedIn,
-          source: verifiedIn || dp.source || "(unverified)",
-          // An unverifiable quote can never count — protects the guarantee.
-          counts: dp.counts === true && !!verifiedIn,
-        };
+  }
+
+  // Split sources into ≤budget character batches, splitting any oversized source
+  // across batches so NOTHING is dropped (the truncation bug is gone).
+  function buildBatches(sources, budget) {
+    const batches = []; let cur = "";
+    const flush = () => { if (cur.trim()) batches.push(cur); cur = ""; };
+    for (const s of sources) {
+      const header = `\n===== SOURCE: ${s.name} =====\n`;
+      const text = s.text || ""; let off = 0;
+      if (!text) continue;
+      while (off < text.length) {
+        const slice = text.slice(off, off + Math.max(1000, budget - header.length));
+        const piece = header + slice;
+        if (cur && cur.length + piece.length > budget) flush();
+        cur += piece; off += slice.length;
+        if (cur.length >= budget) flush();
+      }
+    }
+    flush();
+    return batches;
+  }
+
+  function verifyDataPoints(dps, verify) {
+    return (dps || []).map((dp) => {
+      const v = verify(dp.quote);
+      return { ...dp, verified: !!v, source: v || dp.source || "(unverified)", counts: dp.counts === true && !!v };
+    });
+  }
+
+  // ---- Single call (few / small sources) -----------------------------------
+  async function singleCall(state, sources, opts) {
+    const { text: sourcesText, truncated } = buildSourcesText(sources);
+    if (opts.onStatus) opts.onStatus("Asking Claude to read and assess the sources…");
+    const body = callBody(getModel(), SYSTEM_PROMPT, [TOOL], TOOL.name, [
+      { type: "text", text: "SOURCES (verbatim):\n" + sourcesText, cache_control: { type: "ephemeral" } },
+      { type: "text", text: buildCriteriaText(state) },
+    ], 16000);
+    const { input, usage } = await callTool(body, TOOL.name);
+    const verify = makeVerifier(sources);
+    (input.criteria || []).forEach((c) => { c.data_points = verifyDataPoints(c.data_points, verify); });
+    return { criteria: input.criteria || [], overall: input.overall_parsimony || "", truncated, model: getModel(), usage, mode: "single", calls: 1, sourcesRead: sources.length };
+  }
+
+  // ---- Map-reduce (many / large sources) -----------------------------------
+  async function mapReduce(state, sources, opts) {
+    const model = getModel();
+    const verify = makeVerifier(sources);
+    const batches = buildBatches(sources, BATCH_CHARS);
+    const acc = {};           // critId -> [verified dp]
+    const seen = {};          // critId -> Set(normalized-quote-key) for dedupe
+
+    for (let i = 0; i < batches.length; i++) {
+      if (opts.onStatus) opts.onStatus(`Reading sources — pass ${i + 1} of ${batches.length}…`);
+      const body = callBody(model, EXTRACT_SYSTEM, [EXTRACT_TOOL], EXTRACT_TOOL.name, [
+        { type: "text", text: "SOURCE TEXT (verbatim):\n" + batches[i] },
+        { type: "text", text: buildCriteriaList(state) + "\n\nExtract per-criterion data points from THIS text only. Do not set likelihoods." },
+      ], 12000);
+      let input;
+      try { ({ input } = await callTool(body, EXTRACT_TOOL.name)); }
+      catch (e) { if (opts.onStatus) opts.onStatus(`Pass ${i + 1} failed (${e.message}) — continuing…`); continue; }
+      (input.criteria || []).forEach((c) => {
+        const verified = verifyDataPoints(c.data_points, verify).filter((d) => d.verified);
+        acc[c.id] = acc[c.id] || []; seen[c.id] = seen[c.id] || new Set();
+        verified.forEach((d) => {
+          const k = normalize(d.quote).slice(0, 120);
+          if (seen[c.id].has(k)) return;           // de-duplicate repeated material
+          seen[c.id].add(k); acc[c.id].push(d);
+        });
       });
+    }
+
+    // Consolidate: cap per criterion, preferring source diversity.
+    const consolidated = {};
+    Object.keys(acc).forEach((id) => {
+      const bySource = {};
+      acc[id].forEach((d) => { (bySource[d.source] = bySource[d.source] || []).push(d); });
+      const picked = []; const pools = Object.values(bySource);
+      let idx = 0;
+      while (picked.length < PER_CRITERION_CAP && pools.some((p) => p.length)) {
+        const pool = pools[idx % pools.length]; idx++;
+        if (pool.length) picked.push(pool.shift());
+      }
+      consolidated[id] = picked;
     });
 
-    return { criteria: result.criteria || [], overall: result.overall_parsimony || "", truncated, model, usage: data.usage || {} };
+    // Reduce: one judgment over the consolidated, verbatim-verified evidence.
+    if (opts.onStatus) opts.onStatus("Consolidating and scoring across all sources…");
+    const evidenceText = state.evidence.map((e) => {
+      const dps = consolidated[e.id] || [];
+      if (!dps.length) return `# ${e.id} (${e.name})\n  (no passages found in the sources)`;
+      return `# ${e.id} (${e.name})\n` + dps.map((d) =>
+        `  - [${d.supports || "?"}] ${d.provenance || ""}${d.fallacy && d.fallacy !== "none" ? " FALLACY:" + d.fallacy : ""} · ${d.source}: "${(d.quote || "").replace(/\s+/g, " ").trim().slice(0, 300)}"`).join("\n");
+    }).join("\n\n");
+
+    const reduceSystem = SYSTEM_PROMPT +
+      "\n\nIMPORTANT: You are now given data points ALREADY EXTRACTED and verbatim-verified from many sources. " +
+      "Treat identical or near-identical material repeated across sources as ONE piece of evidence — many books " +
+      "citing the same datum is NOT independent confirmation. Weigh source independence explicitly when setting " +
+      "likelihoods and quality. Choose a representative subset of the supplied data points for data_points.";
+    const body = callBody(model, reduceSystem, [TOOL], TOOL.name, [
+      { type: "text", text: "CONSOLIDATED EVIDENCE (verbatim, de-duplicated across sources):\n" + evidenceText, cache_control: { type: "ephemeral" } },
+      { type: "text", text: buildCriteriaText(state) },
+    ], 16000);
+    const { input, usage } = await callTool(body, TOOL.name);
+    (input.criteria || []).forEach((c) => { c.data_points = verifyDataPoints(c.data_points, verify); });
+    return {
+      criteria: input.criteria || [], overall: input.overall_parsimony || "", truncated: false,
+      model, usage, mode: "map-reduce", calls: batches.length + 1, sourcesRead: sources.length,
+    };
+  }
+
+  /** Run the analysis. opts: { onStatus(msg) }. Returns structured result or throws. */
+  async function analyze(state, opts = {}) {
+    if (!getKey()) throw new Error("No API key set. Add one in Settings.");
+    const sources = (state.sources || []).filter((s) => (s.text || "").trim());
+    if (!sources.length) throw new Error("Upload at least one source first.");
+    const totalChars = sources.reduce((a, s) => a + (s.text || "").length, 0);
+    if (sources.length <= SINGLE_CALL_SOURCES && totalChars <= SINGLE_CALL_CHARS) {
+      return singleCall(state, sources, opts);
+    }
+    return mapReduce(state, sources, opts);
   }
 
   global.ClaudeAnalyst = { analyze, getKey, setKey, getModel, setModel, hasKey, MODELS };
