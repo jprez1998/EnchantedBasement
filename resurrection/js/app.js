@@ -31,6 +31,7 @@
       groups: window.DefaultModel.groups(),
       sources: [],
       framing: "balanced",
+      version: window.DefaultModel.version(),
     };
   }
   const findGroup = (id) => (state.groups || []).find((g) => g.id === id);
@@ -1243,7 +1244,19 @@
     });
   }
 
+  let migrated = false;
   function boot() {
+    // Migrate an older saved model to the current default schema. The hypotheses
+    // and criteria changed structurally (2 → 4 hypotheses, dependency groups, new
+    // criteria), so an old persisted model can't be patched in place — we rebuild
+    // from the current defaults but KEEP the user's uploaded sources.
+    if (state.version !== window.DefaultModel.version()) {
+      const keptSources = Array.isArray(state.sources) ? state.sources : [];
+      state = freshState();
+      state.sources = keptSources;
+      persist();
+      migrated = true;
+    }
     state.groups = state.groups || [];
     // Point PDF.js at its worker (same CDN/version as the library in index.html).
     if (window.pdfjsLib) {
@@ -1252,6 +1265,7 @@
     }
     rescanSources();
     renderAll();
+    if (migrated) setTimeout(() => toast("Updated to the latest criteria set — your uploaded sources were kept."), 400);
 
     $("#btn-recalculate").onclick = onRecalculate;
     $("#btn-add-evidence").onclick = addCriterion;

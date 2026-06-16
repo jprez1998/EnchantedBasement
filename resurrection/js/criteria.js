@@ -497,6 +497,7 @@
   EVIDENCE.forEach((e) => { if (GROUP_MEMBERS[e.id]) e.group = GROUP_MEMBERS[e.id]; });
 
   global.DefaultModel = {
+    version: () => 2, // bump when the default hypotheses/criteria schema changes
     hypotheses: () => JSON.parse(JSON.stringify(HYPOTHESES)),
     evidence: () => JSON.parse(JSON.stringify(EVIDENCE)),
     groups: () => JSON.parse(JSON.stringify(GROUPS)),
