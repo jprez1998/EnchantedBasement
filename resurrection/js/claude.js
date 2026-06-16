@@ -375,6 +375,37 @@
     };
   }
 
+  // Rough cost estimate (USD). Prices are approximate $ per 1M tokens and CAN
+  // CHANGE; prompt caching makes the real cost lower. ~4 chars/token.
+  const PRICES = {
+    "claude-opus-4-8": { in: 5, out: 25 }, "claude-opus-4-7": { in: 5, out: 25 },
+    "claude-opus-4-6": { in: 5, out: 25 }, "claude-sonnet-4-6": { in: 3, out: 15 },
+    "claude-haiku-4-5": { in: 1, out: 5 },
+  };
+  const priceOf = (m) => PRICES[m] || { in: 5, out: 25 };
+
+  function estimate(state) {
+    const sources = (state.sources || []).filter((s) => (s.text || "").trim());
+    const totalChars = sources.reduce((a, s) => a + (s.text || "").length, 0);
+    const tok = Math.ceil(totalChars / 4);
+    const reduceModel = getModel();
+    const single = sources.length <= SINGLE_CALL_SOURCES && totalChars <= SINGLE_CALL_CHARS;
+    let usd, calls, mode;
+    if (single) {
+      const p = priceOf(reduceModel);
+      usd = ((tok + 4000) * p.in + 6000 * p.out) / 1e6;
+      calls = 1; mode = "single";
+    } else {
+      const batches = Math.max(1, Math.ceil(totalChars / BATCH_CHARS));
+      const mp = priceOf(mapModel()), rp = priceOf(reduceModel);
+      const mapUsd = ((tok + batches * 1500) * mp.in + batches * 2500 * mp.out) / 1e6;
+      const redIn = Math.min(40000, state.evidence.length * PER_CRITERION_CAP * 90) + 4000;
+      const redUsd = (redIn * rp.in + 6000 * rp.out) / 1e6;
+      usd = mapUsd + redUsd; calls = batches + 1; mode = "map-reduce";
+    }
+    return { usd, calls, mode, sources: sources.length, totalChars, mapModel: single ? reduceModel : mapModel(), reduceModel };
+  }
+
   /** Run the analysis. opts: { onStatus(msg) }. Returns structured result or throws. */
   async function analyze(state, opts = {}) {
     if (!getKey()) throw new Error("No API key set. Add one in Settings.");
@@ -387,5 +418,5 @@
     return mapReduce(state, sources, opts);
   }
 
-  global.ClaudeAnalyst = { analyze, getKey, setKey, getModel, setModel, getEconomy, setEconomy, hasKey, MODELS, MAP_MODEL };
+  global.ClaudeAnalyst = { analyze, estimate, getKey, setKey, getModel, setModel, getEconomy, setEconomy, hasKey, MODELS, MAP_MODEL };
 })(window);

@@ -902,13 +902,13 @@
     const totalChars = srcs.reduce((a, s) => a + (s.text || "").length, 0);
     if (srcs.length > 6 || totalChars > 500000) {
       const C = window.ClaudeAnalyst;
-      const mapPasses = Math.max(1, Math.ceil(totalChars / 200000));
-      const econ = C.getEconomy();
-      const extractWith = econ ? "Haiku (cheap)" : "your selected model";
+      const est = C.estimate(state);
+      const extractWith = C.getEconomy() ? "Haiku (cheap)" : "your selected model";
+      const dollars = est.usd < 0.01 ? "<$0.01" : "~$" + est.usd.toFixed(2);
       if (!confirm(
         `${srcs.length} sources (${Math.round(totalChars / 1000)}k chars) will be read in full across ` +
-        `~${mapPasses} extraction pass(es) with ${extractWith}, then 1 final scoring pass with your selected model — ` +
-        `~${mapPasses + 1} billed calls on your account. Continue?`)) {
+        `~${est.calls - 1} extraction pass(es) with ${extractWith}, then 1 final scoring pass with your selected model — ` +
+        `~${est.calls} billed calls, rough cost ${dollars} (approximate; prices may change, caching makes it cheaper). Continue?`)) {
         return false;
       }
     }
