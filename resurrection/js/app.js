@@ -530,6 +530,43 @@
     return lines.join("\n");
   }
 
+  function buildRobustnessHtml() {
+    if (!window.BayesRobustness) return "";
+    let rob;
+    try { rob = window.BayesRobustness.analyze(state, { samples: 2000 }); }
+    catch { return ""; }
+    const pro = hyp(rob.proId);
+    const verdict = rob.robust
+      ? `<span class="dp-verdict ok">robust</span>`
+      : `<span class="dp-verdict no">fragile</span>`;
+    const infl = rob.influence.slice(0, 6).map((i) => {
+      const cls = i.delta > 0.002 ? "swing-pos" : i.delta < -0.002 ? "swing-neg" : "";
+      return `<tr><td>${esc(i.name)}</td>
+        <td class="num ${cls}">${(i.delta >= 0 ? "+" : "") + (i.delta * 100).toFixed(1)} pts</td></tr>`;
+    }).join("");
+    return `
+      <h3>Robustness &amp; prior sensitivity ${verdict}</h3>
+      <p>Following a principled Bayesian workflow, we don't report a point estimate alone. Perturbing every
+         prior, auxiliary-assumption plausibility, and likelihood within plausible bounds across
+         <strong>${rob.samples.toLocaleString()}</strong> Monte-Carlo draws, the posterior for
+         <strong style="color:${pro.color}">${esc(pro.short)}</strong> is:</p>
+      <table class="report-table">
+        <tr><th>Point</th><th>Mean under perturbation</th><th>94% interval</th><th>Conclusion holds</th></tr>
+        <tr>
+          <td class="num">${fmtPct(rob.base)}</td>
+          <td class="num">${fmtPct(rob.mean)}</td>
+          <td class="num">${fmtPct(rob.lo)} – ${fmtPct(rob.hi)}</td>
+          <td class="num">${fmtPct(rob.favourFrac)}</td>
+        </tr>
+      </table>
+      <p class="parsimony-note">${rob.robust
+        ? "The leading hypothesis still leads in ≥90% of perturbations — the conclusion is robust to reasonable changes in the inputs."
+        : "The leading hypothesis flips in more than 10% of perturbations — treat the conclusion as <strong>sensitive</strong> to the inputs, not settled."}</p>
+      <h3>Most influential data points (leave-one-out)</h3>
+      <p class="parsimony-note">How much P(${esc(pro.short)}) moves when each datum is removed — a result resting on one fragile datum is visible here.</p>
+      <table class="report-table"><tr><th>Criterion</th><th>Δ P(${esc(pro.short)}) if removed</th></tr>${infl}</table>`;
+  }
+
   function openReport() {
     rescanSources();
     recompute();
@@ -566,6 +603,8 @@
       <p><strong>Net evidential swing:</strong> ${(totalSwing > 0 ? "+" : "") + fmtNum(totalSwing, 1)} decibans
          toward ${totalSwing >= 0 ? esc(pro.short) : esc(con.short)}
          (${window.BayesEngine.bfStrength(r.totals.logBFsum)}).</p>
+
+      ${buildRobustnessHtml()}
 
       <h3>Per-criterion contribution (sorted by impact)</h3>
       <table class="report-table">
