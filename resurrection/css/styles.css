@@ -138,6 +138,9 @@ body {
 .link-btn { background: none; border: none; color: var(--blue); cursor: pointer; font: inherit; font-size: 0.76rem; padding: 0; text-decoration: underline; }
 
 /* ---- Hypotheses / priors -------------------------------------------------- */
+.framing-row { display: block; margin: 4px 0 0; }
+.framing-row select { width: 100%; font: inherit; font-size: 0.9rem; font-weight: 700; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
+.framing-badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; background: var(--wood); color: var(--gold-soft); }
 .hyp-list { display: flex; flex-direction: column; gap: 12px; }
 .hyp-card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: rgba(255,255,255,0.6); }
 .hyp-card.pro { border-left: 5px solid var(--pro); }

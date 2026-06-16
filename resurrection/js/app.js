@@ -30,6 +30,7 @@
       evidence: window.DefaultModel.evidence(),
       groups: window.DefaultModel.groups(),
       sources: [],
+      framing: "balanced",
     };
   }
   const findGroup = (id) => (state.groups || []).find((g) => g.id === id);
@@ -125,6 +126,7 @@
         <span class="big">${esc(oddsTxt)}</span>
         <span class="muted">Evidence swing: ${fmtNum(r.totals.posteriorDecibans - r.totals.priorDecibans, 1)} decibans
           (${window.BayesEngine.bfStrength(r.totals.logBFsum)})</span>
+        ${(state.framing && state.framing !== "custom" && state.framing !== "balanced") ? `<span class="framing-badge">${esc(FRAMING_LABEL[state.framing] || state.framing)} framing</span>` : ""}
         ${(+state.temper > 0) ? `<span class="qual-tag" title="Likelihoods shrunk toward 0.5">tempered −${Math.round(state.temper * 100)}%</span>` : ""}
       </div>`;
   }
@@ -296,6 +298,7 @@
       rng.oninput = () => { $(`[data-pv="${rng.dataset.prior}"]`).textContent = rng.value + "%"; };
       rng.onchange = () => {
         hyp(rng.dataset.prior).prior = parseInt(rng.value, 10) / 100;
+        markCustomFraming();
         recompute();
       };
     });
@@ -306,6 +309,7 @@
     $$("[data-aplaus]").forEach((inp) => inp.onchange = () => {
       const [id, i] = inp.dataset.aplaus.split(":");
       hyp(id).assumptions[+i].plausibility = Math.max(0.01, Math.min(0.99, parseFloat(inp.value) || 0.5));
+      markCustomFraming();
       renderHypotheses(); recompute();
     });
     $$("[data-arem]").forEach((btn) => btn.onclick = () => {
@@ -882,7 +886,7 @@
     const tSlider = $("[data-temper]");
     if (tSlider) {
       tSlider.oninput = () => { $("#temper-pv").textContent = tSlider.value + "%"; };
-      tSlider.onchange = () => { state.temper = +tSlider.value / 100; recompute(); openReport(); };
+      tSlider.onchange = () => { state.temper = +tSlider.value / 100; markCustomFraming(); recompute(); openReport(); };
     }
     $("#report-backdrop").hidden = false;
   }
@@ -1011,6 +1015,16 @@
          the posterior as every likelihood is shrunk toward 0.5 (<code>logit(p')=(1−t)·logit(p)</code>). A conclusion
          that survives moderate tempering is not just an artefact of confident numbers — and the tempering slider lets
          you apply that discount globally.</p>
+      <h3>5c · Framing presets</h3>
+      <p>Much of the disagreement in this debate is not about the data but about the <em>stance</em> you bring to it:
+         how low the prior for a miracle should be, how independent the criteria really are, and how much to trust
+         confident numbers. The <strong>Framing</strong> presets set exactly those contested knobs — hypothesis priors,
+         the background-theism plausibility, within-cluster correlation ρ, and global tempering — and <strong>nothing
+         else</strong>. Your per-datum likelihoods, quality factors, and sources are untouched, so the presets let you
+         A/B the same evidence under a <em>Skeptical (Humean)</em> framing (low miracle prior, near-redundant criteria,
+         tempered) versus a <em>Maximal case</em> framing (higher prior, more independence). The honest takeaway is how
+         far the answer moves on stance alone — if it swings from one side of 50% to the other, the data are not
+         decisive on their own. Editing any of those knobs by hand switches the framing to "Custom".</p>
       <h3>6 · No hallucinated citations</h3>
       <p>Every quotation in the detail drawer is a literal substring of a file you uploaded. If a passage
          does not exist in your sources, it cannot be displayed, and the AI engine discards any quote that
@@ -1114,6 +1128,48 @@
   }
 
   // =========================================================================
+  // Framing presets — set only the contested stance knobs (priors, miracle
+  // prior, within-cluster correlation, tempering). Per-datum likelihoods,
+  // quality, and sources are never touched, so framings A/B cleanly.
+  // =========================================================================
+  const FRAMING_LABEL = { balanced: "Balanced", skeptical: "Skeptical (Humean)", maximal: "Maximal case", custom: "Custom" };
+
+  function applyPreset(name) {
+    const setPrior = (id, p) => { const h = hyp(id); if (h) h.prior = p; };
+    const setRho = (v) => { (state.groups || []).forEach((g) => (g.rho = v)); };
+    const setTheism = (p) => { const R = hyp("R"); if (R && R.assumptions && R.assumptions[0]) R.assumptions[0].plausibility = p; };
+
+    if (name === "skeptical") {
+      // Humean: low prior for a miracle, distrust confident numbers, treat
+      // correlated criteria as nearly redundant (minimal independent evidence).
+      setPrior("R", 0.2); setPrior("Nv", 0.4); setPrior("Nl", 0.2); setPrior("Nd", 0.2);
+      setTheism(0.2); setRho(0.8); state.temper = 0.25;
+    } else if (name === "maximal") {
+      // Strong-case framing: higher miracle prior, criteria treated as more
+      // independent, no tempering.
+      setPrior("R", 0.5); setPrior("Nv", 0.22); setPrior("Nl", 0.16); setPrior("Nd", 0.12);
+      setTheism(0.65); setRho(0.3); state.temper = 0;
+    } else { // balanced — restore shipped defaults for the stance knobs only
+      setPrior("R", 0.4); setPrior("Nv", 0.25); setPrior("Nl", 0.2); setPrior("Nd", 0.15);
+      setTheism(0.5); state.temper = 0;
+      const def = window.DefaultModel.groups();
+      (state.groups || []).forEach((g) => { const d = def.find((x) => x.id === g.id); if (d) g.rho = d.rho; });
+    }
+    state.framing = name;
+    recompute(); renderHypotheses(); renderGroups();
+    const sel = $("#framing-select"); if (sel) sel.value = name;
+    toast(`Framing: ${FRAMING_LABEL[name] || name}`);
+  }
+
+  // Any manual edit to a stance knob means we're no longer on a named preset.
+  function markCustomFraming() {
+    if (state.framing && state.framing !== "custom") {
+      state.framing = "custom";
+      const sel = $("#framing-select"); if (sel) sel.value = "custom";
+    }
+  }
+
+  // =========================================================================
   // Wire global events + boot
   // =========================================================================
   function renderAll() {
@@ -1164,7 +1220,7 @@
     $$("[data-glabel]").forEach((i) => i.onchange = () => { const g = findGroup(i.dataset.glabel); if (g) { g.label = i.value; persist(); renderGroups(); } });
     $$("[data-grho]").forEach((r) => {
       r.oninput = () => { const pv = $(`[data-grhov="${r.dataset.grho}"]`); if (pv) pv.textContent = r.value + "%"; };
-      r.onchange = () => { const g = findGroup(r.dataset.grho); if (g) { g.rho = +r.value / 100; recompute(); renderGroups(); } };
+      r.onchange = () => { const g = findGroup(r.dataset.grho); if (g) { g.rho = +r.value / 100; markCustomFraming(); recompute(); renderGroups(); } };
     });
     $$("[data-gdel]").forEach((b) => b.onclick = () => {
       const id = b.dataset.gdel;
@@ -1201,6 +1257,8 @@
     $("#btn-add-evidence").onclick = addCriterion;
     $("#filter-select").onchange = (e) => { view.filter = e.target.value; renderTable(); };
     $("#sort-select").onchange = (e) => { view.sort = e.target.value; renderTable(); };
+    $("#framing-select").value = state.framing || "custom";
+    $("#framing-select").onchange = (e) => { if (e.target.value !== "custom") applyPreset(e.target.value); };
     $("#btn-help").onclick = openHelp;
     $("#btn-export").onclick = exportModel;
     $("#btn-reset").onclick = resetModel;

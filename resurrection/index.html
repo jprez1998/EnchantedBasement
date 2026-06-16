@@ -6,7 +6,7 @@
   <title>Enchanted Basement · Resurrection Bayes Table</title>
   <meta name="description" content="An interactive Bayesian model-comparison tool for assessing the historical plausibility of the death, burial, and resurrection of Jesus." />
   <link rel="icon" type="image/png" href="Small Logo.png" />
-  <link rel="stylesheet" href="css/styles.css?v=13" />
+  <link rel="stylesheet" href="css/styles.css?v=14" />
 </head>
 <body>
   <header class="site-header">
@@ -104,7 +104,20 @@
 
     <!-- RIGHT: priors, parsimony, sources ------------------------------------->
     <aside class="panel side-panel">
-      <div class="panel-head"><h2>Hypotheses &amp; priors</h2></div>
+      <div class="panel-head"><h2>Framing</h2></div>
+      <label class="framing-row">
+        <select id="framing-select">
+          <option value="custom">Custom / edited</option>
+          <option value="balanced">Balanced (default)</option>
+          <option value="skeptical">Skeptical (Humean)</option>
+          <option value="maximal">Maximal case</option>
+        </select>
+      </label>
+      <p class="hint" id="framing-note">A preset sets only the contested <em>stance</em> knobs — hypothesis priors, the
+        miracle prior, within-cluster correlation ρ, and global tempering. It never changes your per-datum likelihoods,
+        quality, or sources, so you can A/B the framings cleanly.</p>
+
+      <div class="panel-head spaced"><h2>Hypotheses &amp; priors</h2></div>
       <div id="hyp-list" class="hyp-list"><!-- injected --></div>
 
       <div class="panel-head spaced"><h2>Evidence dependencies</h2></div>
@@ -216,12 +229,12 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <script src="js/bayes.js?v=13"></script>
-  <script src="js/criteria.js?v=13"></script>
-  <script src="js/robustness.js?v=13"></script>
-  <script src="js/calibration.js?v=13"></script>
-  <script src="js/sources.js?v=13"></script>
-  <script src="js/claude.js?v=13"></script>
-  <script src="js/app.js?v=13"></script>
+  <script src="js/bayes.js?v=14"></script>
+  <script src="js/criteria.js?v=14"></script>
+  <script src="js/robustness.js?v=14"></script>
+  <script src="js/calibration.js?v=14"></script>
+  <script src="js/sources.js?v=14"></script>
+  <script src="js/claude.js?v=14"></script>
+  <script src="js/app.js?v=14"></script>
 </body>
 </html>
