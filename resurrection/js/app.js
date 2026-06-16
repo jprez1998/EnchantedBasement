@@ -432,55 +432,73 @@
     anachronism: "⚑ anachronism",
   };
 
-  /** Render the exhaustive, assessed data points the author(s) use for one side. */
-  function renderDataPoints(ai, sideKey, h) {
+  const SUPPORT_LABEL = { R: "→ Resurrection", N: "→ Naturalistic", neither: "neutral" };
+  // Drawer data-point filter (persists while the drawer is open).
+  let dpFilter = { side: "this", source: "all", counts: "all" };
+
+  function dpCard(d) {
+    const prov = PROV_LABEL[d.provenance] || d.provenance || "data point";
+    const counts = d.counts;
+    const cls = counts ? "dp-counts" : "dp-discounted";
+    const support = d.supports === "R" ? "sup-R" : d.supports === "N" ? "sup-N" : "sup-x";
+    const supTag = `<span class="dp-support ${support}">${SUPPORT_LABEL[d.supports] || "—"}</span>`;
+    const badge = counts ? `<span class="dp-verdict ok">counts</span>` : `<span class="dp-verdict no">does not count</span>`;
+    const valid = `<span class="dp-validity v-${esc(d.validity || "")}">${esc(d.validity || "—")}</span>`;
+    const fallacy = (d.fallacy && d.fallacy !== "none") ? `<span class="dp-fallacy">${esc(FALLACY_LABEL[d.fallacy] || d.fallacy)}</span>` : "";
+    const adhoc = (d.ad_hoc && d.fallacy !== "ad_hoc") ? `<span class="dp-fallacy">⚑ ad hoc</span>` : "";
+    const attest = d.independently_attested ? `<span class="dp-flag ok" title="Multiple attestation">independently attested</span>` : "";
+    const verified = d.verified ? `<span class="dp-flag ok">verbatim ✓</span>` : `<span class="dp-flag warn">⚠ quote unverified — discarded</span>`;
+    const sideWord = d.supports === "R" ? "Resurrection" : d.supports === "N" ? "Naturalistic" : "the hypotheses";
+    return `
+      <div class="dp ${cls}">
+        <div class="dp-head">${supTag}<span class="dp-prov">${esc(prov)}</span>${valid}${fallacy}${adhoc}${badge}</div>
+        <div class="cmeta">${esc(d.source || "")}${d.cited_source ? " · cites " + esc(d.cited_source) : ""} · ${verified}${attest ? " · " + attest : ""}</div>
+        <blockquote>${esc(d.quote || "")}</blockquote>
+        ${d.why_quoted ? `<p class="dp-line"><strong>Why raised:</strong> ${esc(d.why_quoted)}</p>` : ""}
+        ${d.author_assessment ? `<p class="dp-line"><strong>Author's assessment / context:</strong> ${esc(d.author_assessment)}</p>` : ""}
+        ${d.weight_note ? `<p class="dp-line"><strong>Effect on P(${esc(sideWord)}):</strong> ${esc(d.weight_note)}</p>` : ""}
+      </div>`;
+  }
+
+  /** Fill #dp-section with a filter bar + the matching extracts. */
+  function renderDpSection(evId, sideKey) {
+    const box = document.getElementById("dp-section");
+    if (!box) return;
+    const ai = aiIndex[evId];
+    if (!ai) { box.innerHTML = ""; return; }
     const all = ai.dataPoints || [];
-    const mine = all.filter((d) => d.supports === sideKey);
-    const sideName = sideKey === "R" ? "Resurrection" : "Naturalistic";
+    const srcOptions = [...new Set(all.map((d) => d.source).filter(Boolean))];
+    const other = sideKey === "R" ? "N" : "R";
 
-    let head = `<h3>Data points used for ${esc(sideName)} ✦
-        <span class="cite-count ${mine.length ? "has" : ""}">${mine.length}</span></h3>`;
-    if (ai.rationale) head += `<p class="parsimony-note">${esc(ai.rationale)}</p>`;
+    let list = all.slice();
+    if (dpFilter.side === "this") list = list.filter((d) => d.supports === sideKey);
+    else if (dpFilter.side === "other") list = list.filter((d) => d.supports === other);
+    else if (dpFilter.side === "neutral") list = list.filter((d) => d.supports === "neither");
+    if (dpFilter.source !== "all") list = list.filter((d) => d.source === dpFilter.source);
+    if (dpFilter.counts === "counts") list = list.filter((d) => d.counts);
 
-    if (!mine.length) {
-      return head + `<p class="no-cite">Claude found no data point in your sources that bears on
-        <strong>${esc(sideName)}</strong> for this criterion${all.length ? ` (it read ${all.length} for the other side / neutral)` : ""}.</p>`;
-    }
+    const sel = (id, val, opts) => `<select data-dpf="${id}">${opts.map((o) => `<option value="${o[0]}" ${val === o[0] ? "selected" : ""}>${esc(o[1])}</option>`).join("")}</select>`;
+    const bar = `
+      <div class="dp-filter">
+        ${sel("side", dpFilter.side, [["this", "Supports this side (" + (sideKey === "R" ? "Resurrection" : "Naturalistic") + ")"], ["other", "Supports the other side"], ["neutral", "Neutral"], ["both", "All sides"]])}
+        ${sel("source", dpFilter.source, [["all", "All sources"], ...srcOptions.map((s) => [s, s.length > 36 ? s.slice(0, 34) + "…" : s])])}
+        ${sel("counts", dpFilter.counts, [["all", "Counted + discounted"], ["counts", "Counted only"]])}
+      </div>`;
 
-    const cards = mine.map((d) => {
-      const prov = PROV_LABEL[d.provenance] || d.provenance || "data point";
-      const counts = d.counts;
-      const cls = counts ? "dp-counts" : "dp-discounted";
-      const badge = counts
-        ? `<span class="dp-verdict ok">counts</span>`
-        : `<span class="dp-verdict no">does not count</span>`;
-      const valid = `<span class="dp-validity v-${esc(d.validity || "")}">${esc(d.validity || "—")}</span>`;
-      const fallacy = (d.fallacy && d.fallacy !== "none") ? `<span class="dp-fallacy">${esc(FALLACY_LABEL[d.fallacy] || d.fallacy)}</span>` : "";
-      const adhoc = (d.ad_hoc && !(d.fallacy === "ad_hoc")) ? `<span class="dp-fallacy">⚑ ad hoc</span>` : "";
-      const attest = d.independently_attested ? `<span class="dp-flag ok" title="Multiple attestation">independently attested</span>` : "";
-      const verified = d.verified
-        ? `<span class="dp-flag ok">verbatim ✓</span>`
-        : `<span class="dp-flag warn">⚠ quote not verified — discarded</span>`;
-      return `
-        <div class="dp ${cls}">
-          <div class="dp-head">
-            <span class="dp-prov">${esc(prov)}</span>${valid}${fallacy}${adhoc}${badge}
-          </div>
-          <div class="cmeta">${esc(d.source || "")}${d.cited_source ? " · cites " + esc(d.cited_source) : ""} · ${verified}${attest ? " · " + attest : ""}</div>
-          <blockquote>${esc(d.quote || "")}</blockquote>
-          ${d.why_quoted ? `<p class="dp-line"><strong>Why raised:</strong> ${esc(d.why_quoted)}</p>` : ""}
-          ${d.author_assessment ? `<p class="dp-line"><strong>Author's assessment / context:</strong> ${esc(d.author_assessment)}</p>` : ""}
-          ${d.weight_note ? `<p class="dp-line"><strong>Effect on P(${sideKey === "R" ? "Resurrection" : "Naturalistic"}):</strong> ${esc(d.weight_note)}</p>` : ""}
-        </div>`;
-    }).join("");
+    const cards = list.length
+      ? list.map(dpCard).join("")
+      : `<p class="no-cite">No data points match this filter${all.length ? ` (this criterion has ${all.length} in total — widen the filter to "All sides")` : " — the AI has not assessed this criterion yet; press Recalculate with a key set."}.</p>`;
 
-    const discounted = mine.filter((d) => !d.counts).length;
-    const note = discounted
-      ? `<p class="parsimony-note">${discounted} of these are <strong>raised in favour but do not count</strong> after
-         historical-critical assessment (e.g. a disputed/interpolated source or an unsupported opinion) — shown so the
-         reasoning is transparent.</p>`
-      : "";
-    return head + cards + note;
+    box.innerHTML = `
+      <h3>Extracts &amp; historical-critical assessment ✦
+        <span class="cite-count ${list.length ? "has" : ""}">${list.length}</span></h3>
+      ${ai.rationale ? `<p class="parsimony-note">${esc(ai.rationale)}</p>` : ""}
+      ${bar}${cards}`;
+
+    box.querySelectorAll("[data-dpf]").forEach((s) => s.onchange = () => {
+      dpFilter[s.dataset.dpf] = s.value;
+      renderDpSection(evId, sideKey);
+    });
   }
 
   function openDetail(evId, hypId) {
@@ -522,10 +540,11 @@
 
     const refs = (orig.references || []).map((x) => `<li>${esc(x)}</li>`).join("");
 
-    // Claude's exhaustive, assessed data points for THIS side (R or N).
+    // Claude's exhaustive, assessed data points for THIS side (R or N) — the
+    // filterable section is populated after innerHTML by renderDpSection().
     const ai = aiIndex[evId];
     const sideKey = h.role === "pro" ? "R" : "N";
-    const aiHtml = ai ? renderDataPoints(ai, sideKey, h) : "";
+    const aiHtml = `<div id="dp-section"></div>`;
 
     $("#drawer-content").innerHTML = `
       <h2>${esc(orig.name)}</h2>
@@ -591,6 +610,8 @@
     }
     const qZero = $(`[data-qual0="${evId}"]`);
     if (qZero) qZero.onclick = () => { orig.quality = 0; recompute(); openDetail(evId, hypId); };
+
+    renderDpSection(evId, sideKey); // populate the filterable extracts section
 
     $("#drawer").hidden = false;
     $("#drawer").setAttribute("aria-hidden", "false");
