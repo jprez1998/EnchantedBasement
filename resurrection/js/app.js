@@ -349,6 +349,61 @@
   // =========================================================================
   // Detail drawer (the "click a side to see why" feature)
   // =========================================================================
+  const PROV_LABEL = {
+    quoted_source: "Quotes a source",
+    historical_reference: "Historical reference",
+    author_inference: "Author's inference",
+    author_opinion: "Author's opinion",
+  };
+
+  /** Render the exhaustive, assessed data points the author(s) use for one side. */
+  function renderDataPoints(ai, sideKey, h) {
+    const all = ai.dataPoints || [];
+    const mine = all.filter((d) => d.supports === sideKey);
+    const sideName = sideKey === "R" ? "Resurrection" : "Naturalistic";
+
+    let head = `<h3>Data points used for ${esc(sideName)} ✦
+        <span class="cite-count ${mine.length ? "has" : ""}">${mine.length}</span></h3>`;
+    if (ai.rationale) head += `<p class="parsimony-note">${esc(ai.rationale)}</p>`;
+
+    if (!mine.length) {
+      return head + `<p class="no-cite">Claude found no data point in your sources that bears on
+        <strong>${esc(sideName)}</strong> for this criterion${all.length ? ` (it read ${all.length} for the other side / neutral)` : ""}.</p>`;
+    }
+
+    const cards = mine.map((d) => {
+      const prov = PROV_LABEL[d.provenance] || d.provenance || "data point";
+      const counts = d.counts;
+      const cls = counts ? "dp-counts" : "dp-discounted";
+      const badge = counts
+        ? `<span class="dp-verdict ok">counts</span>`
+        : `<span class="dp-verdict no">does not count</span>`;
+      const valid = `<span class="dp-validity v-${esc(d.validity || "")}">${esc(d.validity || "—")}</span>`;
+      const verified = d.verified
+        ? `<span class="dp-flag ok">verbatim ✓</span>`
+        : `<span class="dp-flag warn">⚠ quote not verified — discarded</span>`;
+      return `
+        <div class="dp ${cls}">
+          <div class="dp-head">
+            <span class="dp-prov">${esc(prov)}</span>${valid}${badge}
+          </div>
+          <div class="cmeta">${esc(d.source || "")}${d.cited_source ? " · cites " + esc(d.cited_source) : ""} · ${verified}</div>
+          <blockquote>${esc(d.quote || "")}</blockquote>
+          ${d.why_quoted ? `<p class="dp-line"><strong>Why raised:</strong> ${esc(d.why_quoted)}</p>` : ""}
+          ${d.author_assessment ? `<p class="dp-line"><strong>Author's assessment / context:</strong> ${esc(d.author_assessment)}</p>` : ""}
+          ${d.weight_note ? `<p class="dp-line"><strong>Effect on P(${sideKey === "R" ? "Resurrection" : "Naturalistic"}):</strong> ${esc(d.weight_note)}</p>` : ""}
+        </div>`;
+    }).join("");
+
+    const discounted = mine.filter((d) => !d.counts).length;
+    const note = discounted
+      ? `<p class="parsimony-note">${discounted} of these are <strong>raised in favour but do not count</strong> after
+         historical-critical assessment (e.g. a disputed/interpolated source or an unsupported opinion) — shown so the
+         reasoning is transparent.</p>`
+      : "";
+    return head + cards + note;
+  }
+
   function openDetail(evId, hypId) {
     const e = lastResult.evidence.find((x) => x.id === evId);
     const orig = state.evidence.find((x) => x.id === evId);
@@ -388,17 +443,10 @@
 
     const refs = (orig.references || []).map((x) => `<li>${esc(x)}</li>`).join("");
 
-    // Claude's analysis for this criterion (if it ran).
+    // Claude's exhaustive, assessed data points for THIS side (R or N).
     const ai = aiIndex[evId];
-    const aiHtml = ai ? `
-      <h3>Claude's reasoning ✦</h3>
-      <p>${esc(ai.rationale)}</p>
-      ${ai.parsimony_note ? `<p class="parsimony-note"><strong>Parsimony:</strong> ${esc(ai.parsimony_note)}</p>` : ""}
-      ${(ai.citations && ai.citations.length) ? ai.citations.map((c) => `
-        <div class="cite"><div class="cmeta">${esc(c.source)} · verified verbatim ✓</div>
-          <blockquote>${esc(c.quote)}</blockquote></div>`).join("")
-        : `<p class="parsimony-note">Claude cited no verbatim passage from your sources for this datum.</p>`}
-    ` : "";
+    const sideKey = h.role === "pro" ? "R" : "N";
+    const aiHtml = ai ? renderDataPoints(ai, sideKey, h) : "";
 
     $("#drawer-content").innerHTML = `
       <h2>${esc(orig.name)}</h2>
@@ -564,7 +612,7 @@
     }
     // Apply Claude's likelihoods to the model and capture its reasoning.
     aiIndex = {};
-    let applied = 0, totalCites = 0;
+    let applied = 0, totalDP = 0, countedDP = 0;
     res.criteria.forEach((c) => {
       const ev = state.evidence.find((x) => x.id === c.id);
       if (!ev) return;
@@ -572,19 +620,19 @@
       const pN = Math.max(0.01, Math.min(0.99, +c.p_naturalistic));
       if (isFinite(pR)) ev.likelihoods[lastResult ? lastResult.pivot.proId : "R"] = pR;
       if (isFinite(pN)) ev.likelihoods[lastResult ? lastResult.pivot.conId : "N"] = pN;
-      const verified = (c.citations || []).filter((x) => x.verified);
-      totalCites += verified.length;
+      const dataPoints = (c.data_points || []);
+      totalDP += dataPoints.length;
+      countedDP += dataPoints.filter((d) => d.counts).length;
       aiIndex[c.id] = {
         rationale: c.rationale || "",
         parsimony_note: c.parsimony_note || "",
-        direction: c.direction || "",
-        citations: verified,
+        dataPoints,
       };
       applied++;
     });
     aiOverall = res.overall || "";
     hideProgress();
-    toast(`Claude assessed ${applied} criteria (${totalCites} verified quote${totalCites === 1 ? "" : "s"})`
+    toast(`Claude assessed ${applied} criteria · ${totalDP} data point${totalDP === 1 ? "" : "s"} read, ${countedDP} counted`
       + (res.truncated ? " — sources truncated to fit" : ""));
     return true;
   }
@@ -625,8 +673,17 @@
          independence. The <code>weight ∈ [0,1]</code> on each datum down-weights its log-likelihood so you can
          model that dependence explicitly instead of pretending it away.</p>
       <h3>5 · No hallucinated citations</h3>
-      <p>Every quotation in the detail drawer is a literal substring of a file you uploaded, shown with its
-         character offsets. If a passage does not exist in your sources, it cannot be displayed.</p>`;
+      <p>Every quotation in the detail drawer is a literal substring of a file you uploaded. If a passage
+         does not exist in your sources, it cannot be displayed, and the AI engine discards any quote that
+         fails the verbatim check — so a discarded quote can never count toward a probability.</p>
+      <h3>6 · Historical-critical assessment of each data point (✦ AI)</h3>
+      <p>With Claude connected, clicking <strong>R</strong> or <strong>¬R</strong> lists every data point the
+         author(s) use for that side, each classified by provenance — <em>quotes a source</em>,
+         <em>historical reference</em>, <em>author's inference</em>, or <em>bare opinion</em> — with the author's
+         own assessment and surrounding context. A datum the author themselves flags as disputed (e.g. an
+         interpolated Testimonium Flavianum) is shown but marked <strong>does not count</strong>: a quotation's
+         weight depends on its authenticity and on whether the author's inference from it is valid, not on the
+         quotation alone.</p>`;
     $("#help-backdrop").hidden = false;
   }
 

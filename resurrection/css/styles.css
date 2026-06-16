@@ -191,6 +191,25 @@ body {
 .cite mark { background: var(--gold-soft); padding: 0 2px; border-radius: 3px; font-style: normal; }
 .no-cite { font-size: 0.85rem; color: #7a6a50; background: #efe6d2; border-radius: 8px; padding: 10px 12px; }
 
+/* Assessed data-point cards (AI, per side) */
+.dp { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 9px 0; background: rgba(255,255,255,0.8); }
+.dp.dp-counts { border-left: 4px solid #2e8b57; }
+.dp.dp-discounted { border-left: 4px solid #b4452f; background: #f6ece4; }
+.dp-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 5px; }
+.dp-prov { font-weight: 700; font-size: 0.82rem; }
+.dp-verdict, .dp-validity, .dp-flag { font-size: 0.7rem; font-weight: 700; padding: 1px 7px; border-radius: 999px; text-transform: uppercase; letter-spacing: .3px; }
+.dp-verdict.ok { background: #d8efdf; color: #1f6b3b; }
+.dp-verdict.no { background: #f3d6cf; color: #8a2f1d; }
+.dp-validity { background: #e9eef7; color: #3a4a66; text-transform: none; letter-spacing: 0; }
+.dp-validity.v-established { background: #d8efdf; color: #1f6b3b; }
+.dp-validity.v-probable { background: #eef6da; color: #5a6b1f; }
+.dp-validity.v-disputed { background: #faf0cf; color: #897012; }
+.dp-validity.v-refuted, .dp-validity.v-author_opinion { background: #f3d6cf; color: #8a2f1d; }
+.dp-flag.ok { background: none; color: #2e8b57; padding: 0; }
+.dp-flag.warn { background: none; color: #b4452f; padding: 0; }
+.dp blockquote { margin: 6px 0; font-style: italic; line-height: 1.45; border-left: 3px solid var(--gold-soft); padding-left: 10px; }
+.dp-line { font-size: 0.84rem; margin: 5px 0 0; line-height: 1.4; }
+
 /* ---- Modals --------------------------------------------------------------- */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(20,12,4,0.45); z-index: 60; display: flex; align-items: center; justify-content: center; padding: 20px; }
 /* The hidden attribute must win over display:flex above, or modals can't close. */

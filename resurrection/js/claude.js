@@ -1,22 +1,20 @@
 /* =============================================================================
- * claude.js — Optional "expert Bayesian historian" analysis via the Anthropic API.
+ * claude.js — Expert historical-critical analysis via the Anthropic API.
  *
- * This runs ONLY when the user supplies their own API key (stored locally in
- * their browser, never in the code). It calls the Messages API directly from
- * the browser using the official direct-browser-access header.
+ * Runs ONLY with the user's own API key (stored in their browser). It calls the
+ * Messages API directly from the browser. The model is forced (via a single
+ * tool) to return, for every criterion, an EXHAUSTIVE list of data points it
+ * actually found in the uploaded texts — each one classified by provenance and
+ * assessed, not quoted ad hoc.
  *
- * What it does:
- *   - Sends the uploaded source texts + the criteria to Claude with a strong
- *     historical-critical-method system prompt.
- *   - Forces a single structured tool call (tool_choice) so the result is
- *     machine-readable: per-criterion P(E|Resurrection), P(E|Naturalistic),
- *     reasoning, a parsimony note, and verbatim quotes.
- *   - VALIDATES every quote Claude returns against the uploaded text. Anything
- *     that is not a literal substring is flagged unverified and never treated
- *     as a citation — preserving the no-hallucination guarantee.
+ * The non-negotiable rule: a quotation's evidential value depends on (a) its
+ * authenticity, (b) why the author cites it, and (c) whether the author's
+ * inference from it is valid. A quoted ancient source the author themselves
+ * flags as a later interpolation (e.g. the Testimonium Flavianum) must NOT be
+ * counted at face value. Context decides weight.
  *
- * The deterministic Bayesian engine still does all the arithmetic; Claude only
- * proposes the likelihoods and the prose, which the user can then edit.
+ * Every quote is validated as a literal substring of the uploaded text; quotes
+ * that fail are flagged and cannot count. No fabricated citations.
  * ========================================================================== */
 
 (function (global) {
@@ -25,7 +23,7 @@
   const KEY_LS = "eb-anthropic-key";
   const MODEL_LS = "eb-anthropic-model";
   const ENDPOINT = "https://api.anthropic.com/v1/messages";
-  const MAX_SOURCE_CHARS = 600000; // ~150k tokens; bounds cost on huge books
+  const MAX_SOURCE_CHARS = 600000; // ~150k tokens; bounds cost on whole books
 
   const MODELS = [
     { id: "claude-opus-4-8", label: "Opus 4.8 — deepest reasoning" },
@@ -40,74 +38,82 @@
   const hasKey = () => !!getKey();
 
   const SYSTEM_PROMPT =
-    "You are a rigorous historian of Christian origins and a careful Bayesian " +
-    "statistician. You apply the historical-critical method: criteria of " +
-    "multiple attestation, embarrassment, dissimilarity, coherence, and " +
-    "contextual credibility, while weighing source dating, dependence, genre, " +
-    "and bias. You reason about PARSIMONY explicitly: a hypothesis that needs " +
-    "many improbable auxiliary assumptions pays for them in its prior. You are " +
-    "fair to both the bodily-resurrection hypothesis and naturalistic " +
-    "alternatives, and you never overstate the evidence.\n\n" +
-    "You will be given (1) two hypotheses, (2) a list of evidential criteria, " +
-    "and (3) the full text of the user's uploaded sources. For EACH criterion " +
-    "estimate P(evidence | Resurrection) and P(evidence | Naturalistic) as " +
-    "probabilities in (0,1) — these are likelihoods, not posteriors. Justify " +
-    "each with the critical method and note the parsimony cost. Ground every " +
-    "claim ONLY in the supplied sources or in standard, well-known historical " +
-    "facts. When you cite, quote the source VERBATIM (an exact substring) and " +
-    "name the source. If the sources do not address a criterion, say so plainly " +
-    "and keep its two likelihoods close together (near-neutral). NEVER invent a " +
-    "quotation or attribute words to a source that are not literally present.";
+    "You are a historian of Christian origins applying the HISTORICAL-CRITICAL " +
+    "METHOD, and a Bayesian epistemologist of testimony. Your task is to read " +
+    "the supplied source texts and, for each evidential criterion, extract the " +
+    "EXHAUSTIVE list of distinct data points the author(s) actually use — then " +
+    "assess each one rigorously rather than ad hoc. Do not summarise; enumerate.\n\n" +
+    "For EACH data point you find in a source text, you MUST:\n" +
+    "1. Quote it VERBATIM — an exact substring of the source — and name the source file.\n" +
+    "2. Classify its provenance as exactly one of:\n" +
+    "   • 'quoted_source' — the author quotes/cites an ancient or external source " +
+    "(Josephus, Tacitus, a Gospel, Paul, a creed, etc.). Name the cited source precisely in cited_source.\n" +
+    "   • 'historical_reference' — the author appeals to a generally established historical fact/event.\n" +
+    "   • 'author_inference' — the author draws their own argued conclusion from evidence.\n" +
+    "   • 'author_opinion' — an assertion or value judgement the author offers without demonstrated support.\n" +
+    "3. State WHY the author raises it (why_quoted).\n" +
+    "4. Capture the AUTHOR'S OWN ASSESSMENT of it (author_assessment): does the author endorse, " +
+    "qualify, dispute, or reject this datum? CONTEXT IS DECISIVE — read the sentences around the quote. " +
+    "Example: if an author quotes the Testimonium Flavianum but the surrounding text says 'nearly all " +
+    "commentators are agreed that the present text cannot be what Josephus actually wrote', then the " +
+    "datum is a disputed Christian interpolation and must NOT be counted at face value.\n" +
+    "5. Give a validity verdict: 'established' | 'probable' | 'disputed' | 'author_opinion' | 'refuted'.\n" +
+    "6. State which hypothesis it bears on (supports: 'R' resurrection, 'N' naturalistic, or 'neither'), " +
+    "whether AFTER assessment it should actually move the probability (counts: true/false), and why (weight_note).\n\n" +
+    "Principles you must apply, not merely mention: distinguish the author's CLAIM from the underlying " +
+    "historical DATUM; never take a quoted ancient source at face value; weigh testimony by source dating, " +
+    "dependence/independence (multiple attestation), the criteria of embarrassment and dissimilarity, and " +
+    "demonstrated reliability; down-weight bare opinion and interpolated or disputed sources to near zero. " +
+    "Then set P(evidence | Resurrection) and P(evidence | Naturalistic) as likelihoods in (0,1) that reflect " +
+    "ONLY the data points that genuinely count after assessment, and weigh parsimony (the cost of auxiliary " +
+    "assumptions each hypothesis needs). If the sources do not address a criterion, return an empty " +
+    "data_points list and say so in the rationale. Quote everything VERBATIM and invent nothing.";
+
+  const DP = {
+    type: "object",
+    properties: {
+      quote: { type: "string", description: "EXACT verbatim substring of the source." },
+      source: { type: "string", description: "The source file name as given." },
+      provenance: { type: "string", enum: ["quoted_source", "historical_reference", "author_inference", "author_opinion"] },
+      cited_source: { type: "string", description: "If quoted_source: the ancient/external source cited, e.g. 'Josephus, Antiquities 18.63-64'." },
+      why_quoted: { type: "string", description: "Why the author raises this datum." },
+      author_assessment: { type: "string", description: "The author's own verdict on it, incl. any caveat from surrounding context (e.g. interpolation)." },
+      validity: { type: "string", enum: ["established", "probable", "disputed", "author_opinion", "refuted"] },
+      supports: { type: "string", enum: ["R", "N", "neither"] },
+      counts: { type: "boolean", description: "Does it actually move the probability after assessment?" },
+      weight_note: { type: "string", description: "How and why it affects (or fails to affect) P(H)." },
+    },
+    required: ["quote", "provenance", "supports", "validity", "counts"],
+  };
 
   const TOOL = {
     name: "submit_assessment",
-    description:
-      "Return the per-criterion likelihood assessment and an overall parsimony judgement.",
+    description: "Return the per-criterion, per-data-point historical-critical assessment.",
     input_schema: {
       type: "object",
       properties: {
         criteria: {
           type: "array",
-          description: "One entry per criterion, in any order.",
           items: {
             type: "object",
             properties: {
               id: { type: "string", description: "The criterion id provided in the prompt." },
               p_resurrection: { type: "number", description: "P(evidence | Bodily Resurrection), in (0,1)." },
               p_naturalistic: { type: "number", description: "P(evidence | Naturalistic), in (0,1)." },
-              direction: {
-                type: "string",
-                enum: ["favors_resurrection", "favors_naturalistic", "neutral"],
-              },
-              rationale: { type: "string", description: "Historical-critical reasoning for the likelihoods." },
+              rationale: { type: "string", description: "How the counting data points set these likelihoods." },
               parsimony_note: { type: "string", description: "What this datum costs each hypothesis in assumptions." },
-              citations: {
-                type: "array",
-                description: "Verbatim quotes from the supplied sources that bear on this criterion.",
-                items: {
-                  type: "object",
-                  properties: {
-                    source: { type: "string", description: "The source name as given." },
-                    quote: { type: "string", description: "An EXACT substring of that source." },
-                  },
-                  required: ["quote"],
-                },
-              },
+              data_points: { type: "array", items: DP },
             },
-            required: ["id", "p_resurrection", "p_naturalistic", "rationale"],
+            required: ["id", "p_resurrection", "p_naturalistic", "data_points"],
           },
         },
-        overall_parsimony: {
-          type: "string",
-          description: "A short synthesis of which hypothesis is more parsimonious given the data.",
-        },
+        overall_parsimony: { type: "string", description: "Synthesis: which hypothesis is more parsimonious given the assessed data." },
       },
       required: ["criteria"],
     },
   };
 
-  /** Collapse whitespace for tolerant verbatim matching. */
-  function normalize(s) { return String(s || "").replace(/\s+/g, " ").trim().toLowerCase(); }
+  const normalize = (s) => String(s || "").replace(/\s+/g, " ").trim().toLowerCase();
 
   function buildSourcesText(sources) {
     let out = "", truncated = false;
@@ -116,37 +122,28 @@
       const remaining = MAX_SOURCE_CHARS - out.length;
       if (remaining <= header.length) { truncated = true; break; }
       let body = s.text || "";
-      if (body.length > remaining - header.length) {
-        body = body.slice(0, remaining - header.length);
-        truncated = true;
-      }
+      if (body.length > remaining - header.length) { body = body.slice(0, remaining - header.length); truncated = true; }
       out += header + body;
     }
     return { text: out.trim(), truncated };
   }
 
   function buildCriteriaText(state) {
-    const lines = [];
-    lines.push("HYPOTHESES:");
+    const lines = ["HYPOTHESES:"];
     state.hypotheses.forEach((h) => {
       lines.push(`- ${h.id} = ${h.name}: ${h.description || ""}`);
       (h.assumptions || []).forEach((a) =>
         lines.push(`    auxiliary assumption (plausibility ${a.plausibility}): ${a.text}`));
     });
-    lines.push("\nCRITERIA (assess each; use the exact id):");
-    state.evidence.forEach((e) => {
-      lines.push(`- id="${e.id}" — ${e.name}: ${e.description || ""}`);
-    });
-    lines.push(
-      "\nReturn your full assessment via the submit_assessment tool. " +
-      "Quote the sources verbatim; if a source does not speak to a criterion, leave its citations empty and say so in the rationale.");
+    lines.push("\nCRITERIA — for each, return its likelihoods plus the EXHAUSTIVE data_points list (use the exact id):");
+    state.evidence.forEach((e) => lines.push(`- id="${e.id}" — ${e.name}: ${e.description || ""}`));
+    lines.push("\nEnumerate every distinct data point the sources actually use for each criterion. " +
+      "Classify provenance, capture the author's assessment and context, judge validity, and decide whether it counts. " +
+      "Quote verbatim. Return everything via the submit_assessment tool.");
     return lines.join("\n");
   }
 
-  /**
-   * Run the analysis. opts: { onStatus(msg) }
-   * Returns { criteria: [...], overall, truncated, usage } or throws.
-   */
+  /** Run the analysis. opts: { onStatus(msg) }. Returns structured result or throws. */
   async function analyze(state, opts = {}) {
     const key = getKey();
     if (!key) throw new Error("No API key set. Add one in Settings.");
@@ -155,26 +152,21 @@
     if (!sources.length) throw new Error("Upload at least one source first.");
 
     const { text: sourcesText, truncated } = buildSourcesText(sources);
-    const criteriaText = buildCriteriaText(state);
-
-    if (opts.onStatus) opts.onStatus("Asking Claude to analyse the sources…");
+    if (opts.onStatus) opts.onStatus("Asking Claude to read and assess the sources…");
 
     const body = {
       model,
-      max_tokens: 8000,
+      max_tokens: 16000,
       system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
       tools: [TOOL],
       tool_choice: { type: "tool", name: "submit_assessment" },
-      messages: [
-        {
-          role: "user",
-          content: [
-            // Big, stable source block first and cached — repeat runs are cheap.
-            { type: "text", text: "SOURCES (verbatim):\n" + sourcesText, cache_control: { type: "ephemeral" } },
-            { type: "text", text: criteriaText },
-          ],
-        },
-      ],
+      messages: [{
+        role: "user",
+        content: [
+          { type: "text", text: "SOURCES (verbatim):\n" + sourcesText, cache_control: { type: "ephemeral" } },
+          { type: "text", text: buildCriteriaText(state) },
+        ],
+      }],
     };
 
     const resp = await fetch(ENDPOINT, {
@@ -197,33 +189,35 @@
     }
 
     const data = await resp.json();
+    if (data.stop_reason === "max_tokens") {
+      throw new Error("Response hit the length limit — try fewer/shorter sources or Sonnet/Haiku.");
+    }
     const toolBlock = (data.content || []).find((b) => b.type === "tool_use" && b.name === TOOL.name);
-    if (!toolBlock) throw new Error("Claude did not return a structured assessment.");
-    const result = toolBlock.input || {};
+    if (!toolBlock || !toolBlock.input) throw new Error("Claude did not return a structured assessment.");
+    const result = toolBlock.input;
 
-    // --- Validate every quote against the uploaded text (no hallucinations) ---
+    // --- Verify every quote against the uploaded text (no hallucinations) ---
     const haystacks = sources.map((s) => ({ name: s.name, norm: normalize(s.text) }));
-    const verifyQuote = (q) => {
+    const verify = (q) => {
       const nq = normalize(q);
-      if (nq.length < 8) return null; // too short to verify meaningfully
+      if (nq.length < 8) return null;
       const hit = haystacks.find((h) => h.norm.includes(nq));
       return hit ? hit.name : null;
     };
-
     (result.criteria || []).forEach((c) => {
-      c.citations = (c.citations || []).map((cit) => {
-        const verifiedIn = verifyQuote(cit.quote);
-        return { ...cit, verified: !!verifiedIn, source: verifiedIn || cit.source || "(unverified)" };
+      c.data_points = (c.data_points || []).map((dp) => {
+        const verifiedIn = verify(dp.quote);
+        return {
+          ...dp,
+          verified: !!verifiedIn,
+          source: verifiedIn || dp.source || "(unverified)",
+          // An unverifiable quote can never count — protects the guarantee.
+          counts: dp.counts === true && !!verifiedIn,
+        };
       });
     });
 
-    return {
-      criteria: result.criteria || [],
-      overall: result.overall_parsimony || "",
-      truncated,
-      model,
-      usage: data.usage || {},
-    };
+    return { criteria: result.criteria || [], overall: result.overall_parsimony || "", truncated, model, usage: data.usage || {} };
   }
 
   global.ClaudeAnalyst = { analyze, getKey, setKey, getModel, setModel, hasKey, MODELS };
