@@ -40,9 +40,14 @@
   // Economy mode: run the bulk extraction (map) passes on a cheap model and keep
   // the final scoring (reduce) pass on the user's chosen model. Default on.
   const ECON_LS = "eb-ai-economy";
+  const DEEP_LS = "eb-ai-deepread";
   const MAP_MODEL = "claude-haiku-4-5";
   const getEconomy = () => { try { return localStorage.getItem(ECON_LS) !== "0"; } catch { return true; } };
   const setEconomy = (on) => { try { localStorage.setItem(ECON_LS, on ? "1" : "0"); } catch {} };
+  // Deep read = read every source in full (map-reduce). Off (default) = retrieval:
+  // for large corpora, pull only the keyword-relevant passages and score in one call.
+  const getDeepRead = () => { try { return localStorage.getItem(DEEP_LS) === "1"; } catch { return false; } };
+  const setDeepRead = (on) => { try { localStorage.setItem(DEEP_LS, on ? "1" : "0"); } catch {} };
   const mapModel = () => (getEconomy() ? MAP_MODEL : getModel());
 
   const SYSTEM_PROMPT =
@@ -230,28 +235,50 @@
     };
   }
 
-  async function callTool(body, toolName) {
-    const resp = await fetch(ENDPOINT, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": getKey(),
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true",
-      },
-      body: JSON.stringify(body),
-    });
-    if (!resp.ok) {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  async function callTool(body, toolName, opts = {}) {
+    const maxTries = 4;
+    let lastErr;
+    for (let attempt = 1; attempt <= maxTries; attempt++) {
+      let resp;
+      try {
+        resp = await fetch(ENDPOINT, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-api-key": getKey(),
+            "anthropic-version": "2023-06-01",
+            "anthropic-dangerous-direct-browser-access": "true",
+          },
+          body: JSON.stringify(body),
+        });
+      } catch (netErr) {
+        // Network blip — retry with backoff.
+        lastErr = new Error("Network error contacting Anthropic.");
+        if (attempt < maxTries) { if (opts.onStatus) opts.onStatus(`Network hiccup — retrying (${attempt}/${maxTries - 1})…`); await sleep(1500 * attempt); continue; }
+        throw lastErr;
+      }
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.stop_reason === "max_tokens") throw new Error("A response hit the length limit — try Sonnet/Haiku or fewer sources.");
+        const block = (data.content || []).find((b) => b.type === "tool_use" && b.name === toolName);
+        if (!block || !block.input) throw new Error("Claude did not return a structured result.");
+        return { input: block.input, usage: data.usage || {} };
+      }
+      // Non-OK. Retry transient (429 / 5xx / 529); fail fast on 401/4xx.
       let detail = ""; try { detail = (await resp.json())?.error?.message || ""; } catch {}
       if (resp.status === 401) throw new Error("Invalid API key (401).");
-      if (resp.status === 429) throw new Error("Rate limited (429) — wait and retry.");
-      throw new Error(`Anthropic API error ${resp.status}${detail ? ": " + detail : ""}`);
+      const transient = resp.status === 429 || resp.status === 529 || resp.status >= 500;
+      lastErr = new Error(`Anthropic API error ${resp.status}${detail ? ": " + detail : ""}`);
+      if (transient && attempt < maxTries) {
+        const backoff = (resp.status === 429 ? 5000 : 2000) * attempt;
+        if (opts.onStatus) opts.onStatus(`${resp.status === 429 ? "Rate limited" : "Server busy"} — retrying in ${backoff / 1000}s (${attempt}/${maxTries - 1})…`);
+        await sleep(backoff); continue;
+      }
+      throw lastErr;
     }
-    const data = await resp.json();
-    if (data.stop_reason === "max_tokens") throw new Error("A response hit the length limit — try Sonnet/Haiku or fewer sources.");
-    const block = (data.content || []).find((b) => b.type === "tool_use" && b.name === toolName);
-    if (!block || !block.input) throw new Error("Claude did not return a structured result.");
-    return { input: block.input, usage: data.usage || {} };
+    throw lastErr || new Error("Request failed.");
   }
 
   function makeVerifier(sources) {
@@ -300,7 +327,7 @@
       { type: "text", text: "SOURCES (verbatim):\n" + sourcesText, cache_control: { type: "ephemeral" } },
       { type: "text", text: buildCriteriaText(state) },
     ], 16000);
-    const { input, usage } = await callTool(body, TOOL.name);
+    const { input, usage } = await callTool(body, TOOL.name, opts);
     const verify = makeVerifier(sources);
     (input.criteria || []).forEach((c) => { c.data_points = verifyDataPoints(c.data_points, verify); });
     return { criteria: input.criteria || [], overall: input.overall_parsimony || "", truncated, model: getModel(), usage, mode: "single", calls: 1, sourcesRead: sources.length };
@@ -322,7 +349,7 @@
         { type: "text", text: buildCriteriaList(state) + "\n\nExtract per-criterion data points from THIS text only. Do not set likelihoods." },
       ], 8000);
       let input;
-      try { ({ input } = await callTool(body, EXTRACT_TOOL.name)); }
+      try { ({ input } = await callTool(body, EXTRACT_TOOL.name, opts)); }
       catch (e) { if (opts.onStatus) opts.onStatus(`Pass ${i + 1} failed (${e.message}) — continuing…`); continue; }
       (input.criteria || []).forEach((c) => {
         const verified = verifyDataPoints(c.data_points, verify).filter((d) => d.verified);
@@ -367,11 +394,76 @@
       { type: "text", text: "CONSOLIDATED EVIDENCE (verbatim, de-duplicated across sources):\n" + evidenceText, cache_control: { type: "ephemeral" } },
       { type: "text", text: buildCriteriaText(state) },
     ], 16000);
-    const { input, usage } = await callTool(body, TOOL.name);
+    const { input, usage } = await callTool(body, TOOL.name, opts);
     (input.criteria || []).forEach((c) => { c.data_points = verifyDataPoints(c.data_points, verify); });
     return {
       criteria: input.criteria || [], overall: input.overall_parsimony || "", truncated: false,
       model, mapModel: mapM, usage, mode: "map-reduce", calls: batches.length + 1, sourcesRead: sources.length,
+    };
+  }
+
+  // ---- Retrieval scoring (default for large corpora) -----------------------
+  // Use the criteria keywords to pull the relevant verbatim passages from every
+  // source, then score in ONE call. Cheap, reliable, grounded — at the cost of
+  // keyword coverage (a passage phrased without the keywords may be missed).
+  const RX_WINDOW = 700, RX_PER_SOURCE = 2, RX_PER_CRIT = 8;
+  const escRx = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  function retrievePassages(state, sources) {
+    const out = {};
+    state.evidence.forEach((e) => {
+      const bySource = {};
+      for (const src of sources) {
+        const text = src.text || ""; let hits = 0; const seen = new Set();
+        for (const kw of (e.keywords || [])) {
+          if (hits >= RX_PER_SOURCE) break;
+          const re = new RegExp(escRx(kw), "gi"); let m;
+          while ((m = re.exec(text)) !== null && hits < RX_PER_SOURCE) {
+            const start = Math.max(0, m.index - (RX_WINDOW >> 1));
+            const end = Math.min(text.length, m.index + m[0].length + (RX_WINDOW >> 1));
+            const key = start >> 8;
+            if (!seen.has(key)) { seen.add(key); (bySource[src.name] = bySource[src.name] || []).push(text.slice(start, end).trim()); hits++; }
+            if (re.lastIndex === m.index) re.lastIndex++;
+          }
+        }
+      }
+      // Round-robin across sources for diversity, capped per criterion.
+      const picked = []; const pools = Object.entries(bySource); let i = 0;
+      while (picked.length < RX_PER_CRIT && pools.some(([, p]) => p.length)) {
+        const [name, pool] = pools[i % pools.length]; i++;
+        if (pool.length) picked.push({ source: name, quote: pool.shift() });
+      }
+      out[e.id] = picked;
+    });
+    return out;
+  }
+
+  async function retrievalScore(state, sources, opts) {
+    if (opts.onStatus) opts.onStatus("Retrieving relevant passages from your sources…");
+    const passages = retrievePassages(state, sources);
+    const verify = makeVerifier(sources);
+    const evidenceText = state.evidence.map((e) => {
+      const ps = passages[e.id] || [];
+      if (!ps.length) return `# ${e.id} (${e.name})\n  (no keyword-matched passage found in the sources)`;
+      return `# ${e.id} (${e.name})\n` + ps.map((p) => `  - ${p.source}: "${p.quote.replace(/\s+/g, " ").trim()}"`).join("\n");
+    }).join("\n\n");
+
+    const sys = SYSTEM_PROMPT +
+      "\n\nIMPORTANT: The passages below were RETRIEVED BY KEYWORD SEARCH from the user's sources, so coverage " +
+      "is imperfect — a criterion with no passage may still be discussed in the sources under different wording; " +
+      "treat 'no passage' as 'not surfaced', not 'the sources are silent'. Quote ONLY from the supplied passages. " +
+      "Treat the same datum repeated across sources as ONE (source independence).";
+    if (opts.onStatus) opts.onStatus("Scoring the retrieved evidence…");
+    const body = callBody(getModel(), sys, [TOOL], TOOL.name, [
+      { type: "text", text: "RETRIEVED PASSAGES (verbatim, keyword-matched):\n" + evidenceText, cache_control: { type: "ephemeral" } },
+      { type: "text", text: buildCriteriaText(state) },
+    ], 16000);
+    const { input, usage } = await callTool(body, TOOL.name, opts);
+    (input.criteria || []).forEach((c) => { c.data_points = verifyDataPoints(c.data_points, verify); });
+    const matched = Object.values(passages).reduce((a, p) => a + p.length, 0);
+    return {
+      criteria: input.criteria || [], overall: input.overall_parsimony || "", truncated: false,
+      model: getModel(), usage, mode: "retrieval", calls: 1, sourcesRead: sources.length, passagesMatched: matched,
     };
   }
 
@@ -395,15 +487,20 @@
       const p = priceOf(reduceModel);
       usd = ((tok + 4000) * p.in + 6000 * p.out) / 1e6;
       calls = 1; mode = "single";
-    } else {
+    } else if (getDeepRead()) {
       const batches = Math.max(1, Math.ceil(totalChars / BATCH_CHARS));
       const mp = priceOf(mapModel()), rp = priceOf(reduceModel);
       const mapUsd = ((tok + batches * 1500) * mp.in + batches * 2500 * mp.out) / 1e6;
       const redIn = Math.min(40000, state.evidence.length * PER_CRITERION_CAP * 90) + 4000;
       const redUsd = (redIn * rp.in + 6000 * rp.out) / 1e6;
       usd = mapUsd + redUsd; calls = batches + 1; mode = "map-reduce";
+    } else {
+      // Retrieval: one call over the keyword-matched passages (bounded).
+      const rp = priceOf(reduceModel);
+      const inTok = Math.min(80000, state.evidence.length * RX_PER_CRIT * (RX_WINDOW / 4)) + 4000;
+      usd = (inTok * rp.in + 6000 * rp.out) / 1e6; calls = 1; mode = "retrieval";
     }
-    return { usd, calls, mode, sources: sources.length, totalChars, mapModel: single ? reduceModel : mapModel(), reduceModel };
+    return { usd, calls, mode, sources: sources.length, totalChars, mapModel: (single || !getDeepRead()) ? reduceModel : mapModel(), reduceModel };
   }
 
   /** Run the analysis. opts: { onStatus(msg) }. Returns structured result or throws. */
@@ -415,8 +512,10 @@
     if (sources.length <= SINGLE_CALL_SOURCES && totalChars <= SINGLE_CALL_CHARS) {
       return singleCall(state, sources, opts);
     }
-    return mapReduce(state, sources, opts);
+    // Large corpus: retrieval (one call, keyword-grounded) unless the user opts
+    // into an exhaustive deep read (full map-reduce).
+    return getDeepRead() ? mapReduce(state, sources, opts) : retrievalScore(state, sources, opts);
   }
 
-  global.ClaudeAnalyst = { analyze, estimate, getKey, setKey, getModel, setModel, getEconomy, setEconomy, hasKey, MODELS, MAP_MODEL };
+  global.ClaudeAnalyst = { analyze, estimate, getKey, setKey, getModel, setModel, getEconomy, setEconomy, getDeepRead, setDeepRead, hasKey, MODELS, MAP_MODEL };
 })(window);

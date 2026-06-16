@@ -6,7 +6,7 @@
   <title>Enchanted Basement · Resurrection Bayes Table</title>
   <meta name="description" content="An interactive Bayesian model-comparison tool for assessing the historical plausibility of the death, burial, and resurrection of Jesus." />
   <link rel="icon" type="image/png" href="Small Logo.png" />
-  <link rel="stylesheet" href="css/styles.css?v=18" />
+  <link rel="stylesheet" href="css/styles.css?v=19" />
 </head>
 <body>
   <header class="site-header">
@@ -208,6 +208,10 @@
           <span>Economy mode — extract with Haiku, score with the model above <span class="muted-note">(recommended; big cost cut on many sources, verbatim-checked)</span></span>
         </label>
         <label class="settings-row checkbox">
+          <input id="ai-deepread" type="checkbox" />
+          <span>Deep read — read every source in full <span class="muted-note">(exhaustive but slow & costly; many calls. Off = retrieval: score only the keyword-relevant passages in one call — recommended for large corpora)</span></span>
+        </label>
+        <label class="settings-row checkbox">
           <input id="ai-on-recalc" type="checkbox" />
           <span>Run Claude automatically when I press Recalculate</span>
         </label>
@@ -237,12 +241,12 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <script src="js/bayes.js?v=18"></script>
-  <script src="js/criteria.js?v=18"></script>
-  <script src="js/robustness.js?v=18"></script>
-  <script src="js/calibration.js?v=18"></script>
-  <script src="js/sources.js?v=18"></script>
-  <script src="js/claude.js?v=18"></script>
-  <script src="js/app.js?v=18"></script>
+  <script src="js/bayes.js?v=19"></script>
+  <script src="js/criteria.js?v=19"></script>
+  <script src="js/robustness.js?v=19"></script>
+  <script src="js/calibration.js?v=19"></script>
+  <script src="js/sources.js?v=19"></script>
+  <script src="js/claude.js?v=19"></script>
+  <script src="js/app.js?v=19"></script>
 </body>
 </html>

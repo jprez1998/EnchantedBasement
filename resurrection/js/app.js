@@ -903,14 +903,15 @@
     if (srcs.length > 6 || totalChars > 500000) {
       const C = window.ClaudeAnalyst;
       const est = C.estimate(state);
-      const extractWith = C.getEconomy() ? "Haiku (cheap)" : "your selected model";
       const dollars = est.usd < 0.01 ? "<$0.01" : "~$" + est.usd.toFixed(2);
-      if (!confirm(
-        `${srcs.length} sources (${Math.round(totalChars / 1000)}k chars) will be read in full across ` +
-        `~${est.calls - 1} extraction pass(es) with ${extractWith}, then 1 final scoring pass with your selected model — ` +
-        `~${est.calls} billed calls, rough cost ${dollars} (approximate; prices may change, caching makes it cheaper). Continue?`)) {
-        return false;
-      }
+      const msg = est.mode === "retrieval"
+        ? `${srcs.length} sources (${Math.round(totalChars / 1000)}k chars). Retrieval mode will pull the keyword-relevant ` +
+          `passages from every source and score them in 1 call (${dollars}). For an exhaustive full read, enable "Deep read" ` +
+          `in ✦ AI settings. Continue?`
+        : `${srcs.length} sources (${Math.round(totalChars / 1000)}k chars) — DEEP READ will read every source in full across ` +
+          `~${est.calls - 1} ${C.getEconomy() ? "Haiku" : ""} extraction pass(es) + 1 scoring pass = ~${est.calls} billed calls, ` +
+          `rough cost ${dollars} (approximate). This can take many minutes; keep the tab open. Continue?`;
+      if (!confirm(msg)) return false;
     }
     setProgress("Contacting Claude…", 0.1);
     let res;
@@ -956,7 +957,9 @@
     aiOverall = res.overall || "";
     hideProgress();
     const modeNote = res.mode === "map-reduce"
-      ? ` — read ${res.sourcesRead} sources in ${res.calls} passes${res.mapModel && res.mapModel !== res.model ? " (Haiku extract → " + res.model.replace("claude-", "").replace(/-/g, " ") + " score)" : ""}`
+      ? ` — deep-read ${res.sourcesRead} sources in ${res.calls} passes${res.mapModel && res.mapModel !== res.model ? " (Haiku extract → " + res.model.replace("claude-", "").replace(/-/g, " ") + " score)" : ""}`
+      : res.mode === "retrieval"
+      ? ` — retrieval over ${res.sourcesRead} sources (${res.passagesMatched} passages)`
       : (res.truncated ? " — sources truncated to fit" : "");
     toast(`Claude assessed ${applied} criteria · ${totalDP} data point${totalDP === 1 ? "" : "s"}, ${countedDP} counted` + modeNote);
     return true;
@@ -1070,6 +1073,7 @@
     sel.value = C.getModel();
     $("#api-key").value = C.getKey();
     $("#ai-economy").checked = C.getEconomy();
+    $("#ai-deepread").checked = C.getDeepRead();
     $("#ai-on-recalc").checked = aiEnabled();
     updateKeyStatus();
     $("#settings-backdrop").hidden = false;
@@ -1085,6 +1089,7 @@
     C.setKey($("#api-key").value.trim());
     C.setModel($("#model-select").value);
     C.setEconomy($("#ai-economy").checked);
+    C.setDeepRead($("#ai-deepread").checked);
     try { localStorage.setItem(AI_ON_LS, $("#ai-on-recalc").checked ? "1" : "0"); } catch {}
     $("#settings-backdrop").hidden = true;
     toast(C.hasKey() ? "AI settings saved" : "Running offline (no key)");
