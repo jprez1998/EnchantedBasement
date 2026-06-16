@@ -58,19 +58,30 @@
     "commentators are agreed that the present text cannot be what Josephus actually wrote', then the " +
     "datum is a disputed Christian interpolation and must NOT be counted at face value.\n" +
     "5. Give a validity verdict: 'established' | 'probable' | 'disputed' | 'author_opinion' | 'refuted'.\n" +
-    "6. State which hypothesis it bears on (supports: 'R' resurrection, 'N' naturalistic, or 'neither'), " +
+    "6. Run a CRITICAL-THINKING check and record any fallacy that taints the point: 'ad_hoc' (an " +
+    "auxiliary claim introduced only to save a theory, with no independent support), 'circular' (assumes " +
+    "what it sets out to prove), 'unfalsifiable' (no possible evidence could count against it), " +
+    "'special_pleading', 'argument_from_silence', 'anachronism', or 'none'. Set ad_hoc=true when the support " +
+    "is contrived to fit. A point that is ad hoc, circular, unfalsifiable, or mere unsupported opinion MUST " +
+    "NOT move the probability: mark counts=false for it.\n" +
+    "7. State which hypothesis it bears on (supports: 'R' resurrection, 'N' naturalistic, or 'neither'), " +
     "whether AFTER assessment it should actually move the probability (counts: true/false), and why (weight_note).\n\n" +
     "Principles you must apply, not merely mention: distinguish the author's CLAIM from the underlying " +
     "historical DATUM; never take a quoted ancient source at face value; weigh testimony by source dating, " +
     "dependence/independence (multiple attestation), the criteria of embarrassment and dissimilarity, and " +
-    "demonstrated reliability; down-weight bare opinion and interpolated or disputed sources to near zero. " +
+    "demonstrated reliability; down-weight bare opinion and interpolated or disputed sources to near zero.\n\n" +
+    "For EACH criterion ALSO return an epistemic-quality factor 'quality' in [0,1] with a one-line " +
+    "'quality_reason'. quality is how much the criterion's argument should be allowed to move the posterior " +
+    "given its critical soundness: 1 = sound, well-attested, non-fallacious; near 0 = the support is ad hoc, " +
+    "circular, unfalsifiable, interpolated, or bare opinion and so should have NO impact in either direction. " +
+    "Set quality low whenever the data points that would move the result are tainted by the checks above.\n\n" +
     "Then, for EACH hypothesis listed in the prompt (the resurrection hypothesis AND each distinct " +
     "naturalistic account), set P(evidence | hypothesis) as a likelihood in (0,1) — reflecting ONLY the data " +
     "points that genuinely count after assessment. 'Naturalistic' is a DISJUNCTION of competing accounts " +
     "(e.g. subjective visions vs legendary development vs unknown fate of the body); give each its own " +
     "likelihood, since a datum can fit one naturalistic account well and another poorly. Weigh parsimony (the " +
     "cost of auxiliary assumptions each hypothesis needs). If the sources do not address a criterion, return an " +
-    "empty data_points list and say so. Quote everything VERBATIM and invent nothing.";
+    "empty data_points list, set quality=0, and say so. Quote everything VERBATIM and invent nothing.";
 
   const DP = {
     type: "object",
@@ -82,8 +93,11 @@
       why_quoted: { type: "string", description: "Why the author raises this datum." },
       author_assessment: { type: "string", description: "The author's own verdict on it, incl. any caveat from surrounding context (e.g. interpolation)." },
       validity: { type: "string", enum: ["established", "probable", "disputed", "author_opinion", "refuted"] },
+      fallacy: { type: "string", enum: ["none", "ad_hoc", "circular", "unfalsifiable", "special_pleading", "argument_from_silence", "anachronism"] },
+      ad_hoc: { type: "boolean", description: "True if the support is contrived only to fit the theory." },
+      independently_attested: { type: "boolean", description: "True if corroborated by an independent source (multiple attestation)." },
       supports: { type: "string", enum: ["R", "N", "neither"] },
-      counts: { type: "boolean", description: "Does it actually move the probability after assessment?" },
+      counts: { type: "boolean", description: "Does it actually move the probability after assessment? Must be false if ad hoc/circular/unfalsifiable/opinion." },
       weight_note: { type: "string", description: "How and why it affects (or fails to affect) P(H)." },
     },
     required: ["quote", "provenance", "supports", "validity", "counts"],
@@ -115,6 +129,8 @@
               },
               rationale: { type: "string", description: "How the counting data points set these likelihoods." },
               parsimony_note: { type: "string", description: "What this datum costs each hypothesis in assumptions." },
+              quality: { type: "number", description: "Epistemic-quality factor in [0,1]: 1 = sound; near 0 = ad hoc/circular/unfalsifiable/opinion → no impact." },
+              quality_reason: { type: "string", description: "One line justifying the quality factor." },
               data_points: { type: "array", items: DP },
             },
             required: ["id", "hyp_likelihoods", "data_points"],

@@ -250,6 +250,11 @@ body {
 .dep-row { display: grid; grid-template-columns: 1fr 130px; gap: 8px; align-items: center; font-size: 0.82rem; padding: 4px 0; border-bottom: 1px dashed var(--line); }
 .dep-row select { font: inherit; font-size: 0.8rem; padding: 3px 5px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
 .dep-tag { display: inline-block; color: #2f5bb0; font-weight: 700; font-size: 0.72rem; background: var(--con-bg); border: 1px solid var(--blue-soft); border-radius: 999px; padding: 0 6px; margin-left: 4px; }
+.qual-tag { display: inline-block; color: #8a6d10; font-weight: 700; font-size: 0.72rem; background: var(--pro-bg); border: 1px solid var(--gold-soft); border-radius: 999px; padding: 0 6px; margin-left: 4px; }
+.qual-tag.neutral { color: #8a2f1d; background: #f3d6cf; border-color: #e3b3a8; }
+.dp-fallacy { font-size: 0.7rem; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: #f3d6cf; color: #8a2f1d; border: 1px solid #e3b3a8; }
+.quality-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+.quality-row input[type=range] { flex: 1; accent-color: var(--gold); }
 
 .site-footer { padding: 14px 22px; text-align: center; font-size: 0.78rem; color: #6a5b44; }
 

@@ -115,14 +115,20 @@
     const evidenceOut = state.evidence.map((e) => {
       const contributions = {};
       const depFactor = e.group ? groupFactor(e.group) : 1;
+      // Epistemic-quality factor kappa in [0,1]. It scales a datum's evidential
+      // weight by the soundness of the reasoning behind it: ad hoc, circular,
+      // unfalsifiable, or bare-opinion support gets kappa -> 0, which forces the
+      // datum's likelihood ratio to 1 (no impact on the posterior in EITHER
+      // direction). Default 1 = take the datum at face value.
+      const quality = e.quality == null ? 1 : Math.max(0, Math.min(1, +e.quality));
       hyps.forEach((h) => {
         const lik = clampProb((e.likelihoods && e.likelihoods[h.id]) ?? 0.5);
         const w = e.weight == null ? 1 : Math.max(0, Math.min(1, +e.weight));
-        const c = w * Math.log(lik);                 // raw weighted log-likelihood
+        const c = quality * w * Math.log(lik);       // quality- and weight-scaled log-likelihood
         contributions[h.id] = c;
-        if (e.enabled !== false) logScore[h.id] += depFactor * c; // discounted in the posterior
+        if (e.enabled !== false) logScore[h.id] += depFactor * c; // also dependency-discounted
       });
-      return { ...e, contributions, depFactor };
+      return { ...e, contributions, depFactor, qualityFactor: quality };
     });
 
     // --- Normalise posteriors via softmax over log scores ------------------

@@ -160,7 +160,8 @@
         <td>
           <div class="crit-name" data-detail="${e.id}">${esc(e.name)}</div>
           <div class="crit-note">${esc(e.note || "")}${(e.depFactor != null && e.depFactor < 0.999)
-            ? ` <span class="dep-tag" title="Correlated-evidence discount">⛓ ×${e.depFactor.toFixed(2)}</span>` : ""}</div>
+            ? ` <span class="dep-tag" title="Correlated-evidence discount">⛓ ×${e.depFactor.toFixed(2)}</span>` : ""}${(e.qualityFactor != null && e.qualityFactor < 0.999)
+            ? ` <span class="qual-tag ${e.qualityFactor < 0.05 ? "neutral" : ""}" title="Epistemic-quality factor">${e.qualityFactor < 0.05 ? "⚖ neutralised" : "⚖ ×" + e.qualityFactor.toFixed(2)}</span>` : ""}</div>
         </td>
         <td class="cell-hyp pro" data-cell="${e.id}" data-hyp="${pro.id}">
           <span class="likeval">${likPro.toFixed(2)}</span>
@@ -386,6 +387,11 @@
     author_inference: "Author's inference",
     author_opinion: "Author's opinion",
   };
+  const FALLACY_LABEL = {
+    ad_hoc: "⚑ ad hoc", circular: "⚑ circular", unfalsifiable: "⚑ unfalsifiable",
+    special_pleading: "⚑ special pleading", argument_from_silence: "⚑ argument from silence",
+    anachronism: "⚑ anachronism",
+  };
 
   /** Render the exhaustive, assessed data points the author(s) use for one side. */
   function renderDataPoints(ai, sideKey, h) {
@@ -410,15 +416,18 @@
         ? `<span class="dp-verdict ok">counts</span>`
         : `<span class="dp-verdict no">does not count</span>`;
       const valid = `<span class="dp-validity v-${esc(d.validity || "")}">${esc(d.validity || "—")}</span>`;
+      const fallacy = (d.fallacy && d.fallacy !== "none") ? `<span class="dp-fallacy">${esc(FALLACY_LABEL[d.fallacy] || d.fallacy)}</span>` : "";
+      const adhoc = (d.ad_hoc && !(d.fallacy === "ad_hoc")) ? `<span class="dp-fallacy">⚑ ad hoc</span>` : "";
+      const attest = d.independently_attested ? `<span class="dp-flag ok" title="Multiple attestation">independently attested</span>` : "";
       const verified = d.verified
         ? `<span class="dp-flag ok">verbatim ✓</span>`
         : `<span class="dp-flag warn">⚠ quote not verified — discarded</span>`;
       return `
         <div class="dp ${cls}">
           <div class="dp-head">
-            <span class="dp-prov">${esc(prov)}</span>${valid}${badge}
+            <span class="dp-prov">${esc(prov)}</span>${valid}${fallacy}${adhoc}${badge}
           </div>
-          <div class="cmeta">${esc(d.source || "")}${d.cited_source ? " · cites " + esc(d.cited_source) : ""} · ${verified}</div>
+          <div class="cmeta">${esc(d.source || "")}${d.cited_source ? " · cites " + esc(d.cited_source) : ""} · ${verified}${attest ? " · " + attest : ""}</div>
           <blockquote>${esc(d.quote || "")}</blockquote>
           ${d.why_quoted ? `<p class="dp-line"><strong>Why raised:</strong> ${esc(d.why_quoted)}</p>` : ""}
           ${d.author_assessment ? `<p class="dp-line"><strong>Author's assessment / context:</strong> ${esc(d.author_assessment)}</p>` : ""}
@@ -495,6 +504,16 @@
       <p class="parsimony-note"><strong>Strength:</strong> ${window.BayesEngine.bfStrength(e.logBF)} —
         this datum ${e.logBF > 0.05 ? "pulls toward " + esc(pro.short) : e.logBF < -0.05 ? "pulls toward " + esc(con.short) : "is roughly neutral between the two hypotheses"}.</p>
 
+      <h3>Epistemic quality (ad-hoc neutraliser)</h3>
+      <p class="parsimony-note">Scales how much this criterion can move the result. <strong>0 = neutralised</strong>
+        (ad hoc / circular / unfalsifiable / opinion-only → no impact in either direction); <strong>1 = full strength</strong>.
+        ${ai && ai.quality_reason ? "Claude's reason: <em>" + esc(ai.quality_reason) + "</em>" : ""}</p>
+      <div class="quality-row">
+        <input type="range" min="0" max="100" value="${Math.round((orig.quality == null ? 1 : orig.quality) * 100)}" data-qual="${evId}">
+        <span class="pv" id="qual-pv">${Math.round((orig.quality == null ? 1 : orig.quality) * 100)}%</span>
+        <button class="btn small" data-qual0="${evId}">Neutralise</button>
+      </div>
+
       <h3>Why it moves the probability</h3>
       <p>${esc(orig.note || "This datum's effect is determined entirely by its likelihood ratio across the hypotheses.")}
          Because P(datum | ${esc(h.short)}) = ${likH.toFixed(2)} versus an across-hypotheses average of ${mean.toFixed(2)},
@@ -525,6 +544,14 @@
       recompute();
       openDetail(evId, hypId); // refresh
     });
+
+    const qSlider = $(`[data-qual="${evId}"]`);
+    if (qSlider) {
+      qSlider.oninput = () => { $("#qual-pv").textContent = qSlider.value + "%"; };
+      qSlider.onchange = () => { orig.quality = +qSlider.value / 100; recompute(); openDetail(evId, hypId); };
+    }
+    const qZero = $(`[data-qual0="${evId}"]`);
+    if (qZero) qZero.onclick = () => { orig.quality = 0; recompute(); openDetail(evId, hypId); };
 
     $("#drawer").hidden = false;
     $("#drawer").setAttribute("aria-hidden", "false");
@@ -599,12 +626,17 @@
       L.push(`\n### ${o.name}${e.enabled === false ? " (excluded)" : ""}`);
       L.push(`- P(E|${pro.short}) = ${(o.likelihoods[pro.id] ?? 0.5)}, P(E|${con.short}) = ${(o.likelihoods[con.id] ?? 0.5)}, weight ${o.weight ?? 1}${o.group ? `, group "${(findGroup(o.group) || {}).label || o.group}"` : ""}`);
       L.push(`- Evidence: ${(e.decibans >= 0 ? "+" : "") + fmtNum(e.decibans, 1)} decibans`);
+      if (e.qualityFactor != null && e.qualityFactor < 0.999) {
+        const ai0 = aiIndex[e.id];
+        L.push(`- Epistemic quality κ=${e.qualityFactor.toFixed(2)}${e.qualityFactor < 0.05 ? " (NEUTRALISED — no impact)" : ""}${ai0 && ai0.quality_reason ? " — " + ai0.quality_reason : ""}`);
+      }
       const ai = aiIndex[e.id];
       if (ai && (ai.dataPoints || []).length) {
         L.push(`- Data points (historical-critical assessment):`);
         ai.dataPoints.forEach((d) => {
           const v = d.verified ? "verbatim✓" : "UNVERIFIED";
-          L.push(`  - [${d.supports}] ${d.counts ? "COUNTS" : "does not count"} · ${d.provenance}${d.cited_source ? " (" + d.cited_source + ")" : ""} · ${d.validity} · ${v}`);
+          const fl = (d.fallacy && d.fallacy !== "none") ? " · FALLACY:" + d.fallacy : (d.ad_hoc ? " · FALLACY:ad_hoc" : "");
+          L.push(`  - [${d.supports}] ${d.counts ? "COUNTS" : "does not count"} · ${d.provenance}${d.cited_source ? " (" + d.cited_source + ")" : ""} · ${d.validity}${fl} · ${v}`);
           if (d.quote) L.push(`    > ${d.quote.replace(/\s+/g, " ").trim()}`);
           if (d.author_assessment) L.push(`    Author's assessment: ${d.author_assessment}`);
         });
@@ -645,6 +677,25 @@
       <table class="report-table">
         <tr><th>Group</th><th>Members</th><th>ρ</th><th>≈ independent</th><th>Evidence ×</th></tr>${rows}
       </table>`;
+  }
+
+  function buildQualityHtml() {
+    const r = lastResult;
+    const flagged = r.evidence.filter((e) => e.qualityFactor != null && e.qualityFactor < 0.999);
+    if (!flagged.length) return "";
+    const rows = flagged.map((e) => {
+      const o = state.evidence.find((x) => x.id === e.id);
+      const ai = aiIndex[e.id];
+      const reason = (ai && ai.quality_reason) ? ai.quality_reason
+        : (o.note || "down-weighted for epistemic quality");
+      return `<tr><td>${esc(o.name)}</td><td class="num">${e.qualityFactor.toFixed(2)}</td>
+        <td>${e.qualityFactor < 0.05 ? "<strong>neutralised</strong>" : "down-weighted"} — ${esc(reason)}</td></tr>`;
+    }).join("");
+    return `
+      <h3>Critical-quality control (ad-hoc neutralisation)</h3>
+      <p>Each criterion's evidential weight is scaled by an epistemic-quality factor κ. Points whose support is
+         ad hoc, circular, unfalsifiable, or mere opinion get κ→0, so they cannot move the posterior in either direction.</p>
+      <table class="report-table"><tr><th>Criterion</th><th>κ</th><th>Why</th></tr>${rows}</table>`;
   }
 
   function buildRobustnessHtml() {
@@ -726,6 +777,8 @@
          toward ${totalSwing >= 0 ? "Resurrection" : "Naturalistic"}
          (${window.BayesEngine.bfStrength(r.totals.logBFsum)}).</p>
 
+      ${buildQualityHtml()}
+
       ${buildDependencyHtml()}
 
       ${buildRobustnessHtml()}
@@ -786,12 +839,19 @@
         const p = Math.max(0.01, Math.min(0.99, +hl.p));
         if (isFinite(p)) ev.likelihoods[hl.hyp_id] = p;
       });
+      // Apply the epistemic-quality factor: ad hoc / circular / unfalsifiable /
+      // opinion-only criteria get kappa -> 0 so they cannot move the posterior.
+      if (c.quality != null && isFinite(+c.quality)) {
+        ev.quality = Math.max(0, Math.min(1, +c.quality));
+      }
       const dataPoints = (c.data_points || []);
       totalDP += dataPoints.length;
       countedDP += dataPoints.filter((d) => d.counts).length;
       aiIndex[c.id] = {
         rationale: c.rationale || "",
         parsimony_note: c.parsimony_note || "",
+        quality: ev.quality,
+        quality_reason: c.quality_reason || "",
         dataPoints,
       };
       applied++;
@@ -852,6 +912,16 @@
          sources <code>n_eff = 1 + (n−1)(1−ρ)</code> and scaled by <code>n_eff/n</code>: at ρ=0 they are independent,
          at ρ=1 the whole group counts as one source. This is why the default posterior is lower than a naïve
          multiplication would give — it refuses to count one tradition several times.</p>
+      <h3>4b · Epistemic quality — ad-hoc points cannot move the result</h3>
+      <p>Each criterion carries an epistemic-quality factor <code>κ ∈ [0,1]</code> that scales its evidential
+         weight by the <em>soundness</em> of the reasoning behind it, independently of how confidently it is
+         asserted. A point whose support is <strong>ad hoc</strong> (contrived only to save a theory),
+         <strong>circular</strong>, <strong>unfalsifiable</strong>, or mere unsupported opinion gets <code>κ→0</code>,
+         which forces its likelihood ratio to 1 — <strong>zero impact on the posterior in either direction.</strong>
+         With Claude connected, every data point is run through a fallacy check (ad hoc, circular, unfalsifiable,
+         special pleading, argument from silence, anachronism) and κ is set accordingly; you can also neutralise
+         any criterion yourself from its detail panel. This is the guard that stops a rhetorically strong but
+         logically empty point from swaying the probability.</p>
       <h3>5 · Robustness &amp; audit trail</h3>
       <p>On Recalculate the report runs a 2,000-draw prior-sensitivity analysis (a 94% interval, not a point
          estimate) and a leave-one-out influence ranking, and you can download a full Markdown report — the
