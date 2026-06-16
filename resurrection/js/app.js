@@ -901,11 +901,14 @@
     const srcs = state.sources.filter((s) => (s.text || "").trim());
     const totalChars = srcs.reduce((a, s) => a + (s.text || "").length, 0);
     if (srcs.length > 6 || totalChars > 500000) {
-      const passes = Math.max(1, Math.ceil(totalChars / 200000)) + 1;
+      const C = window.ClaudeAnalyst;
+      const mapPasses = Math.max(1, Math.ceil(totalChars / 200000));
+      const econ = C.getEconomy();
+      const extractWith = econ ? "Haiku (cheap)" : "your selected model";
       if (!confirm(
-        `${srcs.length} sources (${Math.round(totalChars / 1000)}k chars) will be read in multiple passes — ` +
-        `about ${passes} Claude calls on your account, reading every source in full (no truncation), then one ` +
-        `final scoring pass. Continue?`)) {
+        `${srcs.length} sources (${Math.round(totalChars / 1000)}k chars) will be read in full across ` +
+        `~${mapPasses} extraction pass(es) with ${extractWith}, then 1 final scoring pass with your selected model — ` +
+        `~${mapPasses + 1} billed calls on your account. Continue?`)) {
         return false;
       }
     }
@@ -953,7 +956,7 @@
     aiOverall = res.overall || "";
     hideProgress();
     const modeNote = res.mode === "map-reduce"
-      ? ` — read ${res.sourcesRead} sources in ${res.calls} passes`
+      ? ` — read ${res.sourcesRead} sources in ${res.calls} passes${res.mapModel && res.mapModel !== res.model ? " (Haiku extract → " + res.model.replace("claude-", "").replace(/-/g, " ") + " score)" : ""}`
       : (res.truncated ? " — sources truncated to fit" : "");
     toast(`Claude assessed ${applied} criteria · ${totalDP} data point${totalDP === 1 ? "" : "s"}, ${countedDP} counted` + modeNote);
     return true;
@@ -1066,6 +1069,7 @@
     sel.innerHTML = C.MODELS.map((m) => `<option value="${m.id}">${esc(m.label)}</option>`).join("");
     sel.value = C.getModel();
     $("#api-key").value = C.getKey();
+    $("#ai-economy").checked = C.getEconomy();
     $("#ai-on-recalc").checked = aiEnabled();
     updateKeyStatus();
     $("#settings-backdrop").hidden = false;
@@ -1080,6 +1084,7 @@
     const C = window.ClaudeAnalyst;
     C.setKey($("#api-key").value.trim());
     C.setModel($("#model-select").value);
+    C.setEconomy($("#ai-economy").checked);
     try { localStorage.setItem(AI_ON_LS, $("#ai-on-recalc").checked ? "1" : "0"); } catch {}
     $("#settings-backdrop").hidden = true;
     toast(C.hasKey() ? "AI settings saved" : "Running offline (no key)");

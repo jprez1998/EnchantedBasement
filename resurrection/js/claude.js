@@ -37,6 +37,14 @@
   const setModel = (m) => { try { localStorage.setItem(MODEL_LS, m); } catch {} };
   const hasKey = () => !!getKey();
 
+  // Economy mode: run the bulk extraction (map) passes on a cheap model and keep
+  // the final scoring (reduce) pass on the user's chosen model. Default on.
+  const ECON_LS = "eb-ai-economy";
+  const MAP_MODEL = "claude-haiku-4-5";
+  const getEconomy = () => { try { return localStorage.getItem(ECON_LS) !== "0"; } catch { return true; } };
+  const setEconomy = (on) => { try { localStorage.setItem(ECON_LS, on ? "1" : "0"); } catch {} };
+  const mapModel = () => (getEconomy() ? MAP_MODEL : getModel());
+
   const SYSTEM_PROMPT =
     "You are a historian of Christian origins applying the HISTORICAL-CRITICAL " +
     "METHOD, and a Bayesian epistemologist of testimony. Your task is to read " +
@@ -301,6 +309,7 @@
   // ---- Map-reduce (many / large sources) -----------------------------------
   async function mapReduce(state, sources, opts) {
     const model = getModel();
+    const mapM = mapModel();
     const verify = makeVerifier(sources);
     const batches = buildBatches(sources, BATCH_CHARS);
     const acc = {};           // critId -> [verified dp]
@@ -308,10 +317,10 @@
 
     for (let i = 0; i < batches.length; i++) {
       if (opts.onStatus) opts.onStatus(`Reading sources — pass ${i + 1} of ${batches.length}…`);
-      const body = callBody(model, EXTRACT_SYSTEM, [EXTRACT_TOOL], EXTRACT_TOOL.name, [
+      const body = callBody(mapM, EXTRACT_SYSTEM, [EXTRACT_TOOL], EXTRACT_TOOL.name, [
         { type: "text", text: "SOURCE TEXT (verbatim):\n" + batches[i] },
         { type: "text", text: buildCriteriaList(state) + "\n\nExtract per-criterion data points from THIS text only. Do not set likelihoods." },
-      ], 12000);
+      ], 8000);
       let input;
       try { ({ input } = await callTool(body, EXTRACT_TOOL.name)); }
       catch (e) { if (opts.onStatus) opts.onStatus(`Pass ${i + 1} failed (${e.message}) — continuing…`); continue; }
@@ -362,7 +371,7 @@
     (input.criteria || []).forEach((c) => { c.data_points = verifyDataPoints(c.data_points, verify); });
     return {
       criteria: input.criteria || [], overall: input.overall_parsimony || "", truncated: false,
-      model, usage, mode: "map-reduce", calls: batches.length + 1, sourcesRead: sources.length,
+      model, mapModel: mapM, usage, mode: "map-reduce", calls: batches.length + 1, sourcesRead: sources.length,
     };
   }
 
@@ -378,5 +387,5 @@
     return mapReduce(state, sources, opts);
   }
 
-  global.ClaudeAnalyst = { analyze, getKey, setKey, getModel, setModel, hasKey, MODELS };
+  global.ClaudeAnalyst = { analyze, getKey, setKey, getModel, setModel, getEconomy, setEconomy, hasKey, MODELS, MAP_MODEL };
 })(window);
