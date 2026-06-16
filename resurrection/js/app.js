@@ -89,24 +89,38 @@
   // =========================================================================
   function renderVerdict() {
     const r = lastResult;
-    const sorted = r.hypotheses.slice().sort((a, b) => b.posterior - a.posterior);
-    const bars = sorted.map((h) => `
-      <div class="vbar">
-        <span class="vname" style="color:${h.color}">${esc(h.name)}</span>
-        <div class="vtrack"><div class="vfill" style="width:${(h.posterior * 100).toFixed(1)}%;background:${h.color}"></div></div>
-        <span class="vpct">${fmtPct(h.posterior)}</span>
-      </div>`).join("");
-
     const pro = hyp(r.pivot.proId), con = hyp(r.pivot.conId);
+    const resP = r.totals.resPosterior, natP = r.totals.natPosterior;
+    const natColor = "#5b8def";
+
+    // Headline: Resurrection family vs the Naturalistic disjunction.
+    const famBars = `
+      <div class="vbar">
+        <span class="vname" style="color:${pro.color}">Resurrection</span>
+        <div class="vtrack"><div class="vfill" style="width:${(resP * 100).toFixed(1)}%;background:${pro.color}"></div></div>
+        <span class="vpct">${fmtPct(resP)}</span>
+      </div>
+      <div class="vbar">
+        <span class="vname" style="color:${natColor}">Naturalistic — any</span>
+        <div class="vtrack"><div class="vfill" style="width:${(natP * 100).toFixed(1)}%;background:${natColor}"></div></div>
+        <span class="vpct">${fmtPct(natP)}</span>
+      </div>`;
+
+    // Breakdown of the naturalistic sub-hypotheses (the disjunction's members).
+    const nats = r.hypotheses.filter((h) => h.family === "naturalistic").sort((a, b) => b.posterior - a.posterior);
+    const breakdown = nats.length
+      ? `<div class="vsubs">${nats.map((h) => `<span class="vsub" style="border-color:${h.color}">${esc(h.short)} ${fmtPct(h.posterior)}</span>`).join("")}</div>`
+      : "";
+
     const odds = r.totals.posteriorOdds;
     const oddsTxt = odds >= 1
-      ? `${fmtNum(odds, 2)} : 1 for ${esc(pro.short)}`
-      : `${fmtNum(1 / odds, 2)} : 1 for ${esc(con.short)}`;
+      ? `${fmtNum(odds, 2)} : 1 for Resurrection`
+      : `${fmtNum(1 / odds, 2)} : 1 for Naturalistic`;
 
     $("#verdict").innerHTML = `
-      <div class="verdict-bars">${bars}</div>
+      <div class="verdict-bars">${famBars}${breakdown}</div>
       <div class="verdict-odds">
-        <span class="muted">Posterior odds</span>
+        <span class="muted">Posterior odds (R vs any naturalistic)</span>
         <span class="big">${esc(oddsTxt)}</span>
         <span class="muted">Evidence swing: ${fmtNum(r.totals.posteriorDecibans - r.totals.priorDecibans, 1)} decibans
           (${window.BayesEngine.bfStrength(r.totals.logBFsum)})</span>
@@ -121,7 +135,7 @@
     const pro = hyp(r.pivot.proId), con = hyp(r.pivot.conId);
     $("#th-pro").textContent = pro.short;
     $("#th-pro").style.color = pro.color;
-    $("#th-con").textContent = con.short;
+    $("#th-con").textContent = "Naturalistic (best fit)";
     $("#th-con").style.color = con.color;
 
     const body = $("#bayes-body");
@@ -132,7 +146,10 @@
       if (e.enabled === false) tr.classList.add("row-disabled");
 
       const likPro = (orig.likelihoods[pro.id] ?? 0.5);
-      const likCon = (orig.likelihoods[con.id] ?? 0.5);
+      // The con cell shows the BEST-FITTING naturalistic explanation for THIS datum.
+      const bestCon = hyp(e.bestConId) || con;
+      const conId = bestCon.id;
+      const likCon = (orig.likelihoods[conId] ?? 0.5);
       const cites = (matchIndex[e.id] || []).length;
       const deci = e.enabled === false ? 0 : e.decibans;
       const pillCls = deci > 0.2 ? "bf-pro" : deci < -0.2 ? "bf-con" : "bf-neutral";
@@ -149,8 +166,9 @@
           <span class="likeval">${likPro.toFixed(2)}</span>
           <div class="likebar"><div class="likefill" style="width:${likPro * 100}%"></div></div>
         </td>
-        <td class="cell-hyp con" data-cell="${e.id}" data-hyp="${con.id}">
+        <td class="cell-hyp con" data-cell="${e.id}" data-hyp="${conId}">
           <span class="likeval">${likCon.toFixed(2)}</span>
+          <span class="best-con" title="Best-fitting naturalistic account for this datum">${esc(bestCon.short)}</span>
           <div class="likebar"><div class="likefill" style="width:${likCon * 100}%"></div></div>
         </td>
         <td><input class="cell-edit" type="number" min="0" max="1" step="0.05" value="${orig.weight ?? 1}" data-weight="${e.id}"></td>
@@ -159,10 +177,10 @@
       body.appendChild(tr);
     });
 
-    // Footer totals
-    $("#foot-pro").textContent = fmtPct(pro.posterior);
+    // Footer totals — family posteriors (Resurrection vs the whole disjunction).
+    $("#foot-pro").textContent = fmtPct(r.totals.resPosterior);
     $("#foot-pro").style.color = pro.color;
-    $("#foot-con").textContent = fmtPct(con.posterior);
+    $("#foot-con").textContent = fmtPct(r.totals.natPosterior);
     $("#foot-con").style.color = con.color;
     const totDeci = r.totals.posteriorDecibans;
     $("#foot-bf").textContent = (totDeci > 0 ? "+" : "") + fmtNum(totDeci, 1) + " dB";
@@ -197,7 +215,17 @@
   function renderHypotheses() {
     const list = $("#hyp-list");
     list.innerHTML = "";
-    state.hypotheses.forEach((h) => {
+    const famOf = (h) => h.family || (h.role === "pro" ? "resurrection" : "naturalistic");
+    let lastFam = null;
+    state.hypotheses.slice().sort((a, b) => famOf(a).localeCompare(famOf(b)) === 0 ? 0 : (famOf(a) === "resurrection" ? -1 : 1)).forEach((h) => {
+      const fam = famOf(h);
+      if (fam !== lastFam) {
+        const hd = document.createElement("div");
+        hd.className = "fam-head";
+        hd.textContent = fam === "resurrection" ? "Resurrection" : "Naturalistic disjunction (compared as a family)";
+        list.appendChild(hd);
+        lastFam = fam;
+      }
       const card = document.createElement("div");
       card.className = "hyp-card " + (h.role === "pro" ? "pro" : "con");
       const parsimony = window.BayesEngine.parsimonyFactor(h);
@@ -685,12 +713,17 @@
          <strong>${totalCites}</strong> verbatim citation(s), and re-derived the posterior in log-space.</p>
       <table class="report-table">
         <tr><th>Hypothesis</th><th>Prior</th><th>Parsimony</th><th>Posterior</th></tr>
-        ${r.hypotheses.map((h) => `<tr><td style="color:${h.color}"><strong>${esc(h.name)}</strong></td>
+        ${r.hypotheses.map((h) => `<tr><td style="color:${h.color}"><strong>${esc(h.name)}</strong>${h.family === "naturalistic" ? " <em>(naturalistic)</em>" : ""}</td>
           <td class="num">${fmtPct(h.prior)}</td><td class="num">${h.parsimony.toFixed(3)}</td>
           <td class="num"><strong>${fmtPct(h.posterior)}</strong></td></tr>`).join("")}
+        <tr><td><strong>Resurrection family</strong></td><td></td><td></td><td class="num"><strong>${fmtPct(r.totals.resPosterior)}</strong></td></tr>
+        <tr><td><strong>Naturalistic family (any)</strong></td><td></td><td></td><td class="num"><strong>${fmtPct(r.totals.natPosterior)}</strong></td></tr>
       </table>
+      <p class="parsimony-note">"Naturalistic" is a disjunction: each account competes in the softmax and their posteriors are summed.
+         Per datum the table contrasts Resurrection with the <em>best-fitting</em> naturalistic account, since the disjunction
+         cannot be refuted by beating its weakest member.</p>
       <p><strong>Net evidential swing:</strong> ${(totalSwing > 0 ? "+" : "") + fmtNum(totalSwing, 1)} decibans
-         toward ${totalSwing >= 0 ? esc(pro.short) : esc(con.short)}
+         toward ${totalSwing >= 0 ? "Resurrection" : "Naturalistic"}
          (${window.BayesEngine.bfStrength(r.totals.logBFsum)}).</p>
 
       ${buildDependencyHtml()}
@@ -743,13 +776,16 @@
     // Apply Claude's likelihoods to the model and capture its reasoning.
     aiIndex = {};
     let applied = 0, totalDP = 0, countedDP = 0;
+    const validIds = new Set(state.hypotheses.map((h) => h.id));
     res.criteria.forEach((c) => {
       const ev = state.evidence.find((x) => x.id === c.id);
       if (!ev) return;
-      const pR = Math.max(0.01, Math.min(0.99, +c.p_resurrection));
-      const pN = Math.max(0.01, Math.min(0.99, +c.p_naturalistic));
-      if (isFinite(pR)) ev.likelihoods[lastResult ? lastResult.pivot.proId : "R"] = pR;
-      if (isFinite(pN)) ev.likelihoods[lastResult ? lastResult.pivot.conId : "N"] = pN;
+      // Apply a likelihood per hypothesis id Claude returned (R, Nv, Nl, Nd, …).
+      (c.hyp_likelihoods || []).forEach((hl) => {
+        if (!hl || !validIds.has(hl.hyp_id)) return;
+        const p = Math.max(0.01, Math.min(0.99, +hl.p));
+        if (isFinite(p)) ev.likelihoods[hl.hyp_id] = p;
+      });
       const dataPoints = (c.data_points || []);
       totalDP += dataPoints.length;
       countedDP += dataPoints.filter((d) => d.counts).length;
@@ -798,6 +834,14 @@
       <p>Each hypothesis declares its <em>auxiliary assumptions</em>, each with a plausibility. Their product
          multiplies the prior: <code>P(H & A1 & A2 …) = P(H)·ΠP(Ai)</code>. A theory that must assume many
          improbable things pays for it automatically — the Bayesian form of Occam's razor.</p>
+      <h3>3b · "Naturalistic" is a disjunction, not one hypothesis</h3>
+      <p>Collapsing every naturalistic account into a single column and picking one number understates it. Instead
+         the model enumerates distinct accounts — subjective visions, legendary development, unknown fate of the
+         body — as separate competing hypotheses. Posteriors are normalised over all of them, and the
+         <strong>naturalistic family probability is the sum</strong> of its members (the correct probability of the
+         disjunction). Crucially, each datum in the table is scored against the <strong>best-fitting</strong>
+         naturalistic account <em>for that datum</em>: you cannot refute the disjunction by beating its weakest
+         member. This is why the honest lean is much weaker than a naïve "minimal facts" multiplication suggests.</p>
       <h3>4 · Independence weights and dependency groups</h3>
       <p>The single most common error in arguments like this is <strong>double-counting correlated evidence</strong>:
          multiplying the creed, the appearance reports, and the disciples' transformation as if they were

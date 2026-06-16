@@ -53,8 +53,11 @@
   }
   function proPosterior(model, proId) {
     const r = global.BayesEngine.compute(model);
-    const h = r.hypotheses.find((x) => x.id === proId);
-    return { p: h ? h.posterior : 0, pivot: r.pivot };
+    // Track the Resurrection-family posterior vs the naturalistic-family total.
+    const resP = r.totals.resPosterior != null ? r.totals.resPosterior
+      : (r.hypotheses.find((x) => x.id === proId) || {}).posterior || 0;
+    const natP = r.totals.natPosterior != null ? r.totals.natPosterior : (1 - resP);
+    return { p: resP, natP, pivot: r.pivot };
   }
 
   /**
@@ -70,10 +73,12 @@
 
     const base = global.BayesEngine.compute(state);
     const proId = base.pivot.proId, conId = base.pivot.conId;
-    const baseP = base.hypotheses.find((h) => h.id === proId).posterior;
+    const baseP = base.totals.resPosterior != null
+      ? base.totals.resPosterior : base.hypotheses.find((h) => h.id === proId).posterior;
 
     // --- Monte-Carlo prior/likelihood sensitivity -------------------------
     const draws = new Array(samples);
+    let holds = 0; // perturbations where Resurrection family still beats naturalistic
     for (let i = 0; i < samples; i++) {
       const m = slim(state);
       m.hypotheses.forEach((h) => {
@@ -89,16 +94,16 @@
       // Also perturb the correlation assumption itself, so the interval reflects
       // uncertainty about how dependent the grouped evidence really is.
       (m.groups || []).forEach((g) => { g.rho = jitterLogit(g.rho == null ? 0.001 : g.rho, opts.sigmaRho ?? 0.3, rng); });
-      draws[i] = proPosterior(m, proId).p;
+      const out = proPosterior(m, proId);
+      draws[i] = out.p;
+      if (out.p > out.natP) holds++;
     }
     draws.sort((a, b) => a - b);
     const q = (p) => draws[Math.min(samples - 1, Math.max(0, Math.floor(p * samples)))];
     const mean = draws.reduce((a, b) => a + b, 0) / samples;
-    const lead = base.hypotheses.find((h) => h.id === proId).posterior >=
-      base.hypotheses.find((h) => h.id === conId).posterior ? "pro" : "con";
-    const favourFrac = lead === "pro"
-      ? draws.filter((p) => p > 0.5).length / samples
-      : draws.filter((p) => p < 0.5).length / samples;
+    const baseLeadsRes = baseP >= (base.totals.natPosterior ?? (1 - baseP));
+    const favourFrac = baseLeadsRes ? holds / samples : 1 - holds / samples;
+    const lead = baseLeadsRes ? "pro" : "con";
 
     // --- Leave-one-out influence per datum --------------------------------
     const influence = [];

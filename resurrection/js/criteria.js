@@ -20,47 +20,72 @@
 (function (global) {
   "use strict";
 
+  // "Naturalistic" is modelled as a DISJUNCTION of distinct, coherent accounts,
+  // not a single column. Each is a full competing hypothesis with its own prior,
+  // parsimony cost (auxiliary assumptions), and per-criterion likelihoods. The
+  // engine compares Resurrection against the best-fitting naturalistic account
+  // per datum, and sums the naturalistic posteriors for the family total.
   const HYPOTHESES = [
     {
       id: "R",
       name: "Bodily Resurrection",
-      short: "Resurrection (R)",
+      short: "Resurrection",
       role: "pro",
+      family: "resurrection",
       color: "#c9a227",
-      prior: 0.5,
+      prior: 0.4,
       description:
-        "Jesus of Nazareth was crucified, died, was buried, and was raised " +
-        "bodily, with post-mortem appearances to individuals and groups.",
-      // Occam term: R requires a theistic background in which such an act is
-      // possible. Stated as an auxiliary assumption with an explicit, editable
-      // plausibility so the parsimony cost is visible rather than hidden.
+        "Jesus was crucified, died, was buried, and was raised bodily, with " +
+        "post-mortem appearances to individuals and groups.",
       assumptions: [
-        {
-          text: "A God exists who would have reason to raise Jesus (background theism).",
-          plausibility: 0.5,
-        },
+        { text: "A God exists who would have reason to raise Jesus (background theism).", plausibility: 0.5 },
       ],
     },
     {
-      id: "N",
-      name: "Naturalistic Explanation",
-      short: "Naturalistic (¬R)",
+      id: "Nv",
+      name: "Subjective visions / cognitive dissonance",
+      short: "Visions",
       role: "con",
+      family: "naturalistic",
       color: "#5b8def",
-      prior: 0.5,
+      prior: 0.25,
       description:
-        "The post-crucifixion data are best explained without a miracle: some " +
-        "combination of sincere visionary experiences, legendary development, " +
-        "and ordinary historical processes.",
+        "Grief- and dissonance-driven visionary experiences (Lüdemann, Goulder): " +
+        "sincere disciples 'saw' Jesus; the empty tomb is secondary or legendary.",
       assumptions: [
-        {
-          text: "Independent visionary/grief experiences arose in several disciples.",
-          plausibility: 0.6,
-        },
-        {
-          text: "The empty-tomb tradition developed legendarily or from a misidentified site.",
-          plausibility: 0.6,
-        },
+        { text: "Independent visionary experiences arose in several disciples, including sceptics (Paul, James).", plausibility: 0.5 },
+        { text: "Group appearances reduce to coincident or socially-reinforced individual visions.", plausibility: 0.45 },
+      ],
+    },
+    {
+      id: "Nl",
+      name: "Legendary development",
+      short: "Legend",
+      role: "con",
+      family: "naturalistic",
+      color: "#7c6fd6",
+      prior: 0.2,
+      description:
+        "The physical appearances and empty-tomb narratives grew by legendary " +
+        "accretion over decades; the historical core is minimal.",
+      assumptions: [
+        { text: "Substantial legendary growth occurred despite the very early creed (1 Cor 15).", plausibility: 0.45 },
+      ],
+    },
+    {
+      id: "Nd",
+      name: "Unknown fate of the body",
+      short: "Body unknown",
+      role: "con",
+      family: "naturalistic",
+      color: "#4bb3a7",
+      prior: 0.15,
+      description:
+        "Jesus was probably not buried in a known, identifiable tomb (Ehrman): the " +
+        "body's fate is unknown, and belief arose from later experiences.",
+      assumptions: [
+        { text: "Crucifixion victims were typically not given honourable, marked burial.", plausibility: 0.55 },
+        { text: "The empty-tomb story is a later inference from the appearance belief.", plausibility: 0.55 },
       ],
     },
   ];
@@ -74,7 +99,7 @@
       description:
         "Jesus was executed by Roman crucifixion. Attested across Christian and " +
         "non-Christian sources; near-universally accepted by historians.",
-      likelihoods: { R: 0.99, N: 0.98 },
+      likelihoods: { R: 0.99, Nv: 0.99, Nl: 0.96, Nd: 0.99 },
       weight: 1,
       keywords: ["crucified", "crucifixion", "Pilate", "cross", "executed", "death"],
       references: [
@@ -90,7 +115,7 @@
       description:
         "Jesus was buried in a known tomb by a named member of the Sanhedrin — a " +
         "detail unlikely to be invented (criterion of embarrassment).",
-      likelihoods: { R: 0.92, N: 0.6 },
+      likelihoods: { R: 0.92, Nv: 0.70, Nl: 0.55, Nd: 0.30 },
       weight: 0.8,
       keywords: ["Joseph of Arimathea", "buried", "tomb", "Sanhedrin", "burial"],
       references: [
@@ -106,7 +131,7 @@
       description:
         "The tomb was found empty, first by female disciples whose testimony " +
         "carried little legal weight — again hard to explain as invention.",
-      likelihoods: { R: 0.95, N: 0.45 },
+      likelihoods: { R: 0.95, Nv: 0.50, Nl: 0.40, Nd: 0.60 },
       weight: 0.8,
       keywords: ["empty tomb", "women", "Mary Magdalene", "stone rolled", "he is not here"],
       references: [
@@ -122,7 +147,7 @@
       description:
         "Paul transmits a creed listing appearances, datable to within a few " +
         "years of the crucifixion — too early for legendary accretion.",
-      likelihoods: { R: 0.9, N: 0.4 },
+      likelihoods: { R: 0.90, Nv: 0.85, Nl: 0.40, Nd: 0.80 },
       weight: 1,
       keywords: ["1 Corinthians 15", "received", "delivered", "appeared", "five hundred", "creed"],
       references: [
@@ -138,7 +163,7 @@
       description:
         "Multiple individuals and groups reported encountering the risen Jesus, " +
         "including skeptics (Paul, James).",
-      likelihoods: { R: 0.95, N: 0.5 },
+      likelihoods: { R: 0.95, Nv: 0.60, Nl: 0.45, Nd: 0.60 },
       weight: 0.9,
       keywords: ["appeared", "appearance", "saw the Lord", "Paul", "James", "Cephas", "twelve"],
       references: [
@@ -154,7 +179,7 @@
       description:
         "Followers were transformed from fearful to bold proclaimers, several " +
         "suffering and dying for the claim.",
-      likelihoods: { R: 0.9, N: 0.6 },
+      likelihoods: { R: 0.90, Nv: 0.85, Nl: 0.60, Nd: 0.80 },
       weight: 0.7,
       keywords: ["martyr", "died for", "bold", "persecution", "willing to die", "transformed"],
       references: [
@@ -169,7 +194,7 @@
       description:
         "Bereavement and grief hallucinations are well documented in modern " +
         "clinical literature, providing a naturalistic mechanism for appearances.",
-      likelihoods: { R: 0.4, N: 0.85 },
+      likelihoods: { R: 0.40, Nv: 0.90, Nl: 0.60, Nd: 0.70 },
       weight: 0.8,
       keywords: ["hallucination", "grief", "vision", "bereavement", "cognitive dissonance"],
       references: [
@@ -184,7 +209,7 @@
       description:
         "Later Gospels add increasingly elaborate resurrection details, " +
         "consistent with legendary growth over time.",
-      likelihoods: { R: 0.5, N: 0.85 },
+      likelihoods: { R: 0.50, Nv: 0.70, Nl: 0.90, Nd: 0.70 },
       weight: 0.7,
       keywords: ["legend", "later gospel", "embellish", "redaction", "developed", "contradiction"],
       references: [
@@ -199,7 +224,7 @@
       description:
         "Resurrections are not observed in ordinary experience; the base rate of " +
         "such an event is extremely low absent special background.",
-      likelihoods: { R: 0.8, N: 0.99 },
+      likelihoods: { R: 0.80, Nv: 0.99, Nl: 0.99, Nd: 0.99 },
       weight: 1,
       keywords: ["miracle", "prior probability", "base rate", "laws of nature", "Hume"],
       references: [

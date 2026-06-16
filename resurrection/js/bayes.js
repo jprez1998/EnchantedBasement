@@ -133,37 +133,64 @@
       h.posterior = Math.exp(logScore[h.id] - lse);
     });
 
-    // --- Pivot pair for the two-column Bayes-factor view -------------------
-    // proId = the explicit "resurrection" hypothesis (role === 'pro') or the
-    // first hypothesis; conId = the strongest competing hypothesis.
-    const pro = hyps.find((h) => h.role === "pro") || hyps[0];
-    const competitors = hyps.filter((h) => h.id !== pro.id);
-    const con = competitors.slice().sort((a, b) => b.posterior - a.posterior)[0] || hyps[1] || pro;
+    // --- Family aggregation (Resurrection vs the Naturalistic disjunction) --
+    // "Naturalistic" is not one hypothesis; it is a disjunction of distinct
+    // explanations. We let every sub-hypothesis compete in the softmax and then
+    // sum posteriors by family, which is the correct probability of the
+    // disjunction P(N1 ∨ N2 ∨ …) for mutually-exclusive accounts.
+    const familyOf = (h) => h.family || (h.role === "pro" ? "resurrection" : "naturalistic");
+    const families = {};
+    hyps.forEach((h) => {
+      const fam = familyOf(h); h.family = fam;
+      const f = (families[fam] = families[fam] || { posterior: 0, priorW: 0, members: [] });
+      f.posterior += h.posterior;
+      f.priorW += clampProb(h.prior) * clampProb(h.parsimony); // prior incl. parsimony
+      f.members.push(h.id);
+    });
 
-    // Per-datum Bayes factor (pro vs con) and its decibans contribution.
+    // --- Pivot: Resurrection vs the leading naturalistic account -----------
+    const pro = hyps.find((h) => h.role === "pro") ||
+      hyps.find((h) => h.family === "resurrection") || hyps[0];
+    const natMembers = hyps.filter((h) => h.family === "naturalistic" && h.id !== pro.id);
+    const competitors = hyps.filter((h) => h.id !== pro.id);
+    const conPool = natMembers.length ? natMembers : competitors;
+    const con = conPool.slice().sort((a, b) => b.posterior - a.posterior)[0] || pro;
+
+    // Per-datum Bayes factor: Resurrection vs the BEST-FITTING naturalistic
+    // explanation FOR THAT DATUM (max likelihood among naturalistic members).
+    // You cannot defeat the naturalistic disjunction by beating its weakest
+    // member, so each datum is scored against the best alternative available.
     let logBFsum = 0;
     evidenceOut.forEach((e) => {
       const cp = e.contributions[pro.id] ?? 0;
-      const cc = e.contributions[con.id] ?? 0;
-      // Effective (post-dependency-discount) Bayes factor for this datum, so the
-      // per-row decibans reconcile with the discounted posterior.
-      const logBF = e.depFactor * (cp - cc);
+      let best = conPool[0], bestC = e.contributions[(conPool[0] || pro).id] ?? 0;
+      conPool.forEach((m) => { const c = e.contributions[m.id] ?? 0; if (c > bestC) { bestC = c; best = m; } });
+      const logBF = e.depFactor * (cp - bestC);
       e.logBF = logBF;
-      e.rawLogBF = cp - cc;
-      e.decibans = (10 / Math.log(10)) * logBF; // 10*log10(BF)
-      e.swing = logBF; // signed: >0 favours pro, <0 favours con
+      e.rawLogBF = cp - bestC;
+      e.decibans = (10 / Math.log(10)) * logBF;
+      e.swing = logBF;
+      e.bestConId = best ? best.id : con.id;
       if (e.enabled !== false) logBFsum += logBF;
     });
 
-    const priorLogOdds = pro.logPrior - con.logPrior;
-    const postLogOdds = logScore[pro.id] - logScore[con.id];
+    const resP = (families.resurrection && families.resurrection.posterior) || pro.posterior;
+    const natP = (families.naturalistic && families.naturalistic.posterior) || con.posterior;
+    const resPW = (families.resurrection && families.resurrection.priorW) || (clampProb(pro.prior) * clampProb(pro.parsimony));
+    const natPW = (families.naturalistic && families.naturalistic.priorW) ||
+      (clampProb(con.prior) * clampProb(con.parsimony));
+    const priorLogOdds = Math.log(clampProb(resPW)) - Math.log(clampProb(natPW));
+    const postLogOdds = Math.log(clampProb(resP)) - Math.log(clampProb(natP));
 
     return {
       hypotheses: hyps,
       evidence: evidenceOut,
+      families,
       pivot: { proId: pro.id, conId: con.id },
       totals: {
         logBFsum,
+        resPosterior: resP,
+        natPosterior: natP,
         priorDecibans: (10 / Math.log(10)) * priorLogOdds,
         posteriorDecibans: (10 / Math.log(10)) * postLogOdds,
         priorOdds: Math.exp(priorLogOdds),

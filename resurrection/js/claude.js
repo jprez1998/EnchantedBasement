@@ -64,10 +64,13 @@
     "historical DATUM; never take a quoted ancient source at face value; weigh testimony by source dating, " +
     "dependence/independence (multiple attestation), the criteria of embarrassment and dissimilarity, and " +
     "demonstrated reliability; down-weight bare opinion and interpolated or disputed sources to near zero. " +
-    "Then set P(evidence | Resurrection) and P(evidence | Naturalistic) as likelihoods in (0,1) that reflect " +
-    "ONLY the data points that genuinely count after assessment, and weigh parsimony (the cost of auxiliary " +
-    "assumptions each hypothesis needs). If the sources do not address a criterion, return an empty " +
-    "data_points list and say so in the rationale. Quote everything VERBATIM and invent nothing.";
+    "Then, for EACH hypothesis listed in the prompt (the resurrection hypothesis AND each distinct " +
+    "naturalistic account), set P(evidence | hypothesis) as a likelihood in (0,1) — reflecting ONLY the data " +
+    "points that genuinely count after assessment. 'Naturalistic' is a DISJUNCTION of competing accounts " +
+    "(e.g. subjective visions vs legendary development vs unknown fate of the body); give each its own " +
+    "likelihood, since a datum can fit one naturalistic account well and another poorly. Weigh parsimony (the " +
+    "cost of auxiliary assumptions each hypothesis needs). If the sources do not address a criterion, return an " +
+    "empty data_points list and say so. Quote everything VERBATIM and invent nothing.";
 
   const DP = {
     type: "object",
@@ -98,13 +101,23 @@
             type: "object",
             properties: {
               id: { type: "string", description: "The criterion id provided in the prompt." },
-              p_resurrection: { type: "number", description: "P(evidence | Bodily Resurrection), in (0,1)." },
-              p_naturalistic: { type: "number", description: "P(evidence | Naturalistic), in (0,1)." },
+              hyp_likelihoods: {
+                type: "array",
+                description: "P(evidence | hypothesis) for EVERY hypothesis id listed in the prompt.",
+                items: {
+                  type: "object",
+                  properties: {
+                    hyp_id: { type: "string", description: "Exact hypothesis id from the prompt (e.g. R, Nv, Nl, Nd)." },
+                    p: { type: "number", description: "Likelihood in (0,1)." },
+                  },
+                  required: ["hyp_id", "p"],
+                },
+              },
               rationale: { type: "string", description: "How the counting data points set these likelihoods." },
               parsimony_note: { type: "string", description: "What this datum costs each hypothesis in assumptions." },
               data_points: { type: "array", items: DP },
             },
-            required: ["id", "p_resurrection", "p_naturalistic", "data_points"],
+            required: ["id", "hyp_likelihoods", "data_points"],
           },
         },
         overall_parsimony: { type: "string", description: "Synthesis: which hypothesis is more parsimonious given the assessed data." },
