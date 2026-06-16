@@ -6,7 +6,7 @@
   <title>Enchanted Basement · Resurrection Bayes Table</title>
   <meta name="description" content="An interactive Bayesian model-comparison tool for assessing the historical plausibility of the death, burial, and resurrection of Jesus." />
   <link rel="icon" type="image/png" href="Small Logo.png" />
-  <link rel="stylesheet" href="css/styles.css?v=11" />
+  <link rel="stylesheet" href="css/styles.css?v=12" />
 </head>
 <body>
   <header class="site-header">
@@ -48,6 +48,31 @@
         fits each hypothesis (its likelihood). <strong>Click a cell</strong> to see
         why it moves the probability and the verbatim source passages behind it.
       </p>
+      <div class="table-tools">
+        <label>Filter
+          <select id="filter-select">
+            <option value="all">All criteria</option>
+            <option value="pro">Favour Resurrection</option>
+            <option value="con">Favour Naturalistic</option>
+            <option value="neutral">Near-neutral</option>
+            <option value="downweighted">Down-weighted / neutralised (κ&lt;1)</option>
+            <option value="correlated">Correlated / discounted</option>
+            <option value="cited">Has citations</option>
+            <option value="off">Excluded</option>
+          </select>
+        </label>
+        <label>Sort
+          <select id="sort-select">
+            <option value="default">Default order</option>
+            <option value="impact">Impact (|decibans|)</option>
+            <option value="pro">Most pro-Resurrection</option>
+            <option value="con">Most pro-Naturalistic</option>
+            <option value="quality">Lowest quality first</option>
+            <option value="name">Name (A–Z)</option>
+          </select>
+        </label>
+        <span class="tools-count" id="tools-count"></span>
+      </div>
       <div class="table-scroll">
         <table class="bayes-table" id="bayes-table">
           <thead>
@@ -191,12 +216,12 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <script src="js/bayes.js?v=11"></script>
-  <script src="js/criteria.js?v=11"></script>
-  <script src="js/robustness.js?v=11"></script>
-  <script src="js/calibration.js?v=11"></script>
-  <script src="js/sources.js?v=11"></script>
-  <script src="js/claude.js?v=11"></script>
-  <script src="js/app.js?v=11"></script>
+  <script src="js/bayes.js?v=12"></script>
+  <script src="js/criteria.js?v=12"></script>
+  <script src="js/robustness.js?v=12"></script>
+  <script src="js/calibration.js?v=12"></script>
+  <script src="js/sources.js?v=12"></script>
+  <script src="js/claude.js?v=12"></script>
+  <script src="js/app.js?v=12"></script>
 </body>
 </html>

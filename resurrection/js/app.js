@@ -22,6 +22,7 @@
   let matchIndex = {};         // evidenceId -> [verbatim snippet, ...]
   let aiIndex = {};            // evidenceId -> { rationale, parsimony_note, citations, direction }
   let aiOverall = "";          // Claude's overall parsimony synthesis (last run)
+  const view = { filter: "all", sort: "default" }; // table filter/sort (UI only)
 
   function freshState() {
     return {
@@ -139,9 +140,41 @@
     $("#th-con").textContent = "Naturalistic (best fit)";
     $("#th-con").style.color = con.color;
 
+    // Apply the view's filter + sort. Totals stay model-wide (unfiltered).
+    const passes = (e) => {
+      switch (view.filter) {
+        case "pro": return e.enabled !== false && e.decibans > 0.2;
+        case "con": return e.enabled !== false && e.decibans < -0.2;
+        case "neutral": return e.enabled !== false && Math.abs(e.decibans) <= 0.2;
+        case "downweighted": return e.qualityFactor != null && e.qualityFactor < 0.999;
+        case "correlated": return e.depFactor != null && e.depFactor < 0.999;
+        case "cited": return (matchIndex[e.id] || []).length > 0;
+        case "off": return e.enabled === false;
+        default: return true;
+      }
+    };
+    const order = { default: 0 };
+    r.evidence.forEach((e, i) => (order[e.id] = i));
+    const rows = r.evidence.filter(passes).sort((a, b) => {
+      switch (view.sort) {
+        case "impact": return Math.abs(b.decibans) - Math.abs(a.decibans);
+        case "pro": return b.decibans - a.decibans;
+        case "con": return a.decibans - b.decibans;
+        case "quality": return (a.qualityFactor ?? 1) - (b.qualityFactor ?? 1);
+        case "name": return String(a.name).localeCompare(String(b.name));
+        default: return order[a.id] - order[b.id];
+      }
+    });
+    const cnt = $("#tools-count");
+    if (cnt) cnt.textContent = rows.length === r.evidence.length
+      ? `${r.evidence.length} criteria` : `${rows.length} of ${r.evidence.length}`;
+
     const body = $("#bayes-body");
     body.innerHTML = "";
-    r.evidence.forEach((e) => {
+    if (!rows.length) {
+      body.innerHTML = `<tr><td colspan="7" class="empty-rows">No criteria match this filter.</td></tr>`;
+    }
+    rows.forEach((e) => {
       const orig = state.evidence.find((x) => x.id === e.id);
       const tr = document.createElement("tr");
       if (e.enabled === false) tr.classList.add("row-disabled");
@@ -1166,6 +1199,8 @@
 
     $("#btn-recalculate").onclick = onRecalculate;
     $("#btn-add-evidence").onclick = addCriterion;
+    $("#filter-select").onchange = (e) => { view.filter = e.target.value; renderTable(); };
+    $("#sort-select").onchange = (e) => { view.sort = e.target.value; renderTable(); };
     $("#btn-help").onclick = openHelp;
     $("#btn-export").onclick = exportModel;
     $("#btn-reset").onclick = resetModel;
