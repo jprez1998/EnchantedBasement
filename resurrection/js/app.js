@@ -124,6 +124,7 @@
         <span class="big">${esc(oddsTxt)}</span>
         <span class="muted">Evidence swing: ${fmtNum(r.totals.posteriorDecibans - r.totals.priorDecibans, 1)} decibans
           (${window.BayesEngine.bfStrength(r.totals.logBFsum)})</span>
+        ${(+state.temper > 0) ? `<span class="qual-tag" title="Likelihoods shrunk toward 0.5">tempered −${Math.round(state.temper * 100)}%</span>` : ""}
       </div>`;
   }
 
@@ -610,6 +611,18 @@
       } catch {}
     }
 
+    if (window.BayesCalibration) {
+      try {
+        const c = window.BayesCalibration.analyze(state);
+        L.push(`\n## Calibration & overconfidence`);
+        if (+state.temper > 0) L.push(`- Global tempering active: likelihoods shrunk ${Math.round(state.temper * 100)}% toward 0.5.`);
+        L.push(`- Overconfidence index: ${fmtPct(c.overconfidence)}; extreme likelihoods (≥0.95/≤0.05): ${c.extreme.length}; Cromwell (~0/1): ${c.cromwell.length}`);
+        L.push(`- Top datum dominance: ${c.dominance.top.name} (${fmtPct(c.dominance.top.share)} of evidential weight)`);
+        L.push(`- Tempering curve P(R-family): ` + c.curve.map((p) => `${Math.round(p.temper * 100)}%→${fmtPct(p.resP)}`).join(", "));
+        c.recommendations.forEach((rline) => L.push(`- ${rline}`));
+      } catch {}
+    }
+
     const groups = (state.groups || []).filter((g) => state.evidence.some((e) => e.group === g.id));
     if (groups.length) {
       L.push(`\n## Dependency groups`);
@@ -698,6 +711,30 @@
       <table class="report-table"><tr><th>Criterion</th><th>κ</th><th>Why</th></tr>${rows}</table>`;
   }
 
+  function buildCalibrationHtml() {
+    if (!window.BayesCalibration) return "";
+    let c;
+    try { c = window.BayesCalibration.analyze(state); } catch { return ""; }
+    const temper = Math.max(0, Math.min(1, +state.temper || 0));
+    const curve = c.curve.map((p) => `<tr><td class="num">${Math.round(p.temper * 100)}%</td><td class="num">${fmtPct(p.resP)}</td></tr>`).join("");
+    const recs = c.recommendations.map((x) => `<li>${esc(x)}</li>`).join("");
+    const exTop = c.extreme.slice(0, 8).map((x) => `${esc(x.name)} · ${esc(x.hyp)} = ${(+x.p).toFixed(2)}`).join("; ");
+    return `
+      <h3>Calibration &amp; overconfidence</h3>
+      <p>Subjective likelihoods are prone to overconfidence, and one near-0/near-1 number can dominate everything.
+         Overconfidence index (share of strong likelihoods): <strong>${fmtPct(c.overconfidence)}</strong>;
+         top datum supplies <strong>${fmtPct(c.dominance.top.share)}</strong> of the evidential weight.</p>
+      ${c.extreme.length ? `<p class="parsimony-note"><strong>Extreme likelihoods (≥0.95 / ≤0.05):</strong> ${esc(exTop)}${c.extreme.length > 8 ? " …" : ""}</p>` : ""}
+      <p><strong>Tempering curve</strong> — the posterior as every likelihood is shrunk toward 0.5 (distrusting confident numbers):</p>
+      <table class="report-table"><tr><th>Temper</th><th>P(Resurrection family)</th></tr>${curve}</table>
+      <div class="quality-row">
+        <span class="parsimony-note">Apply tempering globally:</span>
+        <input type="range" min="0" max="90" value="${Math.round(temper * 100)}" data-temper>
+        <span class="pv" id="temper-pv">${Math.round(temper * 100)}%</span>
+      </div>
+      <ul class="refs">${recs}</ul>`;
+  }
+
   function buildRobustnessHtml() {
     if (!window.BayesRobustness) return "";
     let rob;
@@ -783,6 +820,8 @@
 
       ${buildRobustnessHtml()}
 
+      ${buildCalibrationHtml()}
+
       <h3>Per-criterion contribution (sorted by impact)</h3>
       <table class="report-table">
         <tr><th>Criterion</th><th>Decibans</th><th>Favors</th><th>Cites</th></tr>
@@ -807,6 +846,11 @@
          copy the prompt below into any LLM. It instructs the model to cite verbatim and never fabricate.</p>
       <pre id="analysis-prompt">${esc(buildAnalysisPrompt())}</pre>`;
 
+    const tSlider = $("[data-temper]");
+    if (tSlider) {
+      tSlider.oninput = () => { $("#temper-pv").textContent = tSlider.value + "%"; };
+      tSlider.onchange = () => { state.temper = +tSlider.value / 100; recompute(); openReport(); };
+    }
     $("#report-backdrop").hidden = false;
   }
 
@@ -926,6 +970,14 @@
       <p>On Recalculate the report runs a 2,000-draw prior-sensitivity analysis (a 94% interval, not a point
          estimate) and a leave-one-out influence ranking, and you can download a full Markdown report — the
          priors, likelihoods, per-datum assessments, citations, and robustness — as a reproducible audit trail.</p>
+      <h3>5b · Calibration &amp; overconfidence</h3>
+      <p>Subjective likelihoods tend to be over-confident, and a single near-0 or near-1 number can dominate
+         everything. The report audits for this: it flags likelihoods pinned at ~0/~1 (<strong>Cromwell's rule</strong> —
+         asserting the data are impossible or certain under a hypothesis), reports whether one datum supplies most of
+         the evidential weight, and warns on over-extreme posteriors. It also shows a <strong>tempering curve</strong>:
+         the posterior as every likelihood is shrunk toward 0.5 (<code>logit(p')=(1−t)·logit(p)</code>). A conclusion
+         that survives moderate tempering is not just an artefact of confident numbers — and the tempering slider lets
+         you apply that discount globally.</p>
       <h3>6 · No hallucinated citations</h3>
       <p>Every quotation in the detail drawer is a literal substring of a file you uploaded. If a passage
          does not exist in your sources, it cannot be displayed, and the AI engine discards any quote that

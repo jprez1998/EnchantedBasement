@@ -49,6 +49,7 @@
       hypotheses: JSON.parse(JSON.stringify(state.hypotheses)),
       evidence: JSON.parse(JSON.stringify(state.evidence)),
       groups: JSON.parse(JSON.stringify(state.groups || [])), // keep dependency discount
+      temper: state.temper || 0,                              // keep calibration tempering
     };
   }
   function proPosterior(model, proId) {

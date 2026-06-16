@@ -112,6 +112,17 @@
     const logScore = {};
     hyps.forEach((h) => (logScore[h.id] = h.logPrior));
 
+    // Global likelihood TEMPERING (calibration against overconfidence): shrink
+    // every likelihood toward 0.5 on the logit scale by a factor (1 - temper).
+    // temper=0 leaves likelihoods as stated; temper=1 maps all to 0.5 (the data
+    // carry no evidence). This lets the user discount overconfident elicitation.
+    const temper = Math.max(0, Math.min(1, +state.temper || 0));
+    const temperP = (p) => {
+      if (temper <= 0) return p;
+      const x = Math.log(p / (1 - p)) * (1 - temper);
+      return 1 / (1 + Math.exp(-x));
+    };
+
     const evidenceOut = state.evidence.map((e) => {
       const contributions = {};
       const depFactor = e.group ? groupFactor(e.group) : 1;
@@ -122,7 +133,7 @@
       // direction). Default 1 = take the datum at face value.
       const quality = e.quality == null ? 1 : Math.max(0, Math.min(1, +e.quality));
       hyps.forEach((h) => {
-        const lik = clampProb((e.likelihoods && e.likelihoods[h.id]) ?? 0.5);
+        const lik = temperP(clampProb((e.likelihoods && e.likelihoods[h.id]) ?? 0.5));
         const w = e.weight == null ? 1 : Math.max(0, Math.min(1, +e.weight));
         const c = quality * w * Math.log(lik);       // quality- and weight-scaled log-likelihood
         contributions[h.id] = c;
