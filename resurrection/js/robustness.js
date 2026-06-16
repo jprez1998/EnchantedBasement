@@ -48,6 +48,7 @@
     return {
       hypotheses: JSON.parse(JSON.stringify(state.hypotheses)),
       evidence: JSON.parse(JSON.stringify(state.evidence)),
+      groups: JSON.parse(JSON.stringify(state.groups || [])), // keep dependency discount
     };
   }
   function proPosterior(model, proId) {
@@ -85,6 +86,9 @@
           e.likelihoods[k] = jitterLogit(e.likelihoods[k], sLik, rng);
         });
       });
+      // Also perturb the correlation assumption itself, so the interval reflects
+      // uncertainty about how dependent the grouped evidence really is.
+      (m.groups || []).forEach((g) => { g.rho = jitterLogit(g.rho == null ? 0.001 : g.rho, opts.sigmaRho ?? 0.3, rng); });
       draws[i] = proPosterior(m, proId).p;
     }
     draws.sort((a, b) => a - b);

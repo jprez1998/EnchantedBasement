@@ -90,19 +90,39 @@
     });
 
     // --- Accumulate weighted log-likelihoods -------------------------------
+    // Dependency groups: correlated criteria (e.g. several reports of one early
+    // tradition) must not be multiplied at full strength. Each group has a
+    // correlation rho in [0,1]; we discount its combined evidence to an
+    // "effective number of independent sources" n_eff = 1 + (n-1)(1-rho), and
+    // scale every member's contribution by n_eff/n. rho=0 → independent (no
+    // change); rho=1 → the whole group counts as a single source.
+    const groupRho = {};
+    (state.groups || []).forEach((g) => { groupRho[g.id] = Math.min(1, Math.max(0, +g.rho || 0)); });
+    const groupCount = {};
+    state.evidence.forEach((e) => {
+      if (e.enabled !== false && e.group) groupCount[e.group] = (groupCount[e.group] || 0) + 1;
+    });
+    const groupFactor = (gid) => {
+      const n = groupCount[gid] || 0;
+      if (n <= 1) return 1;
+      const nEff = 1 + (n - 1) * (1 - (groupRho[gid] ?? 0));
+      return nEff / n;
+    };
+
     const logScore = {};
     hyps.forEach((h) => (logScore[h.id] = h.logPrior));
 
     const evidenceOut = state.evidence.map((e) => {
       const contributions = {};
+      const depFactor = e.group ? groupFactor(e.group) : 1;
       hyps.forEach((h) => {
         const lik = clampProb((e.likelihoods && e.likelihoods[h.id]) ?? 0.5);
         const w = e.weight == null ? 1 : Math.max(0, Math.min(1, +e.weight));
-        const c = w * Math.log(lik);
+        const c = w * Math.log(lik);                 // raw weighted log-likelihood
         contributions[h.id] = c;
-        if (e.enabled !== false) logScore[h.id] += c;
+        if (e.enabled !== false) logScore[h.id] += depFactor * c; // discounted in the posterior
       });
-      return { ...e, contributions };
+      return { ...e, contributions, depFactor };
     });
 
     // --- Normalise posteriors via softmax over log scores ------------------
@@ -125,8 +145,11 @@
     evidenceOut.forEach((e) => {
       const cp = e.contributions[pro.id] ?? 0;
       const cc = e.contributions[con.id] ?? 0;
-      const logBF = cp - cc; // natural-log Bayes factor for this datum
+      // Effective (post-dependency-discount) Bayes factor for this datum, so the
+      // per-row decibans reconcile with the discounted posterior.
+      const logBF = e.depFactor * (cp - cc);
       e.logBF = logBF;
+      e.rawLogBF = cp - cc;
       e.decibans = (10 / Math.log(10)) * logBF; // 10*log10(BF)
       e.swing = logBF; // signed: >0 favours pro, <0 favours con
       if (e.enabled !== false) logBFsum += logBF;

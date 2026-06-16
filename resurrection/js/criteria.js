@@ -210,8 +210,20 @@
     },
   ];
 
+  // Default dependency group: the creed, the group appearances, and the
+  // disciples' transformation are largely the SAME early proclamation tradition
+  // seen from three angles — not three independent witnesses. Grouping them with
+  // a moderate correlation stops the engine from multiplying one tradition three
+  // times. Fully editable; set rho=0 to treat them as independent.
+  const GROUPS = [
+    { id: "g-proclamation", label: "Early appearance / proclamation tradition", rho: 0.5 },
+  ];
+  const GROUP_MEMBERS = { creed: "g-proclamation", appearances: "g-proclamation", transformation: "g-proclamation" };
+  EVIDENCE.forEach((e) => { if (GROUP_MEMBERS[e.id]) e.group = GROUP_MEMBERS[e.id]; });
+
   global.DefaultModel = {
     hypotheses: () => JSON.parse(JSON.stringify(HYPOTHESES)),
     evidence: () => JSON.parse(JSON.stringify(EVIDENCE)),
+    groups: () => JSON.parse(JSON.stringify(GROUPS)),
   };
 })(window);

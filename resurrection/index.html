@@ -6,7 +6,7 @@
   <title>Enchanted Basement · Resurrection Bayes Table</title>
   <meta name="description" content="An interactive Bayesian model-comparison tool for assessing the historical plausibility of the death, burial, and resurrection of Jesus." />
   <link rel="icon" type="image/png" href="Small Logo.png" />
-  <link rel="stylesheet" href="css/styles.css?v=7" />
+  <link rel="stylesheet" href="css/styles.css?v=8" />
 </head>
 <body>
   <header class="site-header">
@@ -82,6 +82,9 @@
       <div class="panel-head"><h2>Hypotheses &amp; priors</h2></div>
       <div id="hyp-list" class="hyp-list"><!-- injected --></div>
 
+      <div class="panel-head spaced"><h2>Evidence dependencies</h2></div>
+      <div id="dep-panel" class="dep-panel"><!-- injected --></div>
+
       <div class="panel-head spaced"><h2>Sources</h2>
         <span class="src-count" id="src-count">0 loaded</span>
       </div>
@@ -127,6 +130,7 @@
       <div id="report-content" class="modal-body"><!-- injected --></div>
       <div class="modal-foot">
         <button id="btn-copy-prompt" class="btn small">Copy analysis prompt</button>
+        <button id="btn-download-report" class="btn small">Download report (.md)</button>
         <button id="report-ok" class="btn primary">Done</button>
       </div>
     </div>
@@ -187,11 +191,11 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <script src="js/bayes.js?v=7"></script>
-  <script src="js/criteria.js?v=7"></script>
-  <script src="js/robustness.js?v=7"></script>
-  <script src="js/sources.js?v=7"></script>
-  <script src="js/claude.js?v=7"></script>
-  <script src="js/app.js?v=7"></script>
+  <script src="js/bayes.js?v=8"></script>
+  <script src="js/criteria.js?v=8"></script>
+  <script src="js/robustness.js?v=8"></script>
+  <script src="js/sources.js?v=8"></script>
+  <script src="js/claude.js?v=8"></script>
+  <script src="js/app.js?v=8"></script>
 </body>
 </html>

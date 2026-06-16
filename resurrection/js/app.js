@@ -27,9 +27,11 @@
     return {
       hypotheses: window.DefaultModel.hypotheses(),
       evidence: window.DefaultModel.evidence(),
+      groups: window.DefaultModel.groups(),
       sources: [],
     };
   }
+  const findGroup = (id) => (state.groups || []).find((g) => g.id === id);
   function load() {
     try {
       const raw = localStorage.getItem(LS_KEY);
@@ -140,7 +142,8 @@
         <td class="col-toggle"><input type="checkbox" class="toggle" data-id="${e.id}" ${e.enabled === false ? "" : "checked"} title="Include in calculation"></td>
         <td>
           <div class="crit-name" data-detail="${e.id}">${esc(e.name)}</div>
-          <div class="crit-note">${esc(e.note || "")}</div>
+          <div class="crit-note">${esc(e.note || "")}${(e.depFactor != null && e.depFactor < 0.999)
+            ? ` <span class="dep-tag" title="Correlated-evidence discount">⛓ ×${e.depFactor.toFixed(2)}</span>` : ""}</div>
         </td>
         <td class="cell-hyp pro" data-cell="${e.id}" data-hyp="${pro.id}">
           <span class="likeval">${likPro.toFixed(2)}</span>
@@ -530,6 +533,92 @@
     return lines.join("\n");
   }
 
+  // Reproducible audit trail (the bayesian-workflow "report.md" principle).
+  function buildAuditMarkdown() {
+    const r = window.BayesEngine.compute(state);
+    const pro = hyp(r.pivot.proId), con = hyp(r.pivot.conId);
+    const L = [];
+    L.push(`# Resurrection Bayes Table — analysis report`);
+    L.push(`_Generated ${new Date().toISOString()}_\n`);
+    L.push(`## Posterior`);
+    r.hypotheses.forEach((h) => L.push(`- **${h.name}**: ${fmtPct(h.posterior)} (prior ${fmtPct(h.prior)}, parsimony ${h.parsimony.toFixed(3)})`));
+    const sw = r.totals.posteriorDecibans - r.totals.priorDecibans;
+    L.push(`\nNet evidential swing: ${(sw > 0 ? "+" : "") + fmtNum(sw, 1)} decibans toward ${sw >= 0 ? pro.short : con.short} (${window.BayesEngine.bfStrength(r.totals.logBFsum)}).`);
+
+    if (window.BayesRobustness) {
+      try {
+        const rob = window.BayesRobustness.analyze(state, { samples: 2000 });
+        L.push(`\n## Robustness (prior sensitivity, ${rob.samples} perturbations)`);
+        L.push(`- P(${pro.short}) point ${fmtPct(rob.base)}, mean ${fmtPct(rob.mean)}, 94% interval ${fmtPct(rob.lo)}–${fmtPct(rob.hi)}`);
+        L.push(`- Conclusion holds in ${fmtPct(rob.favourFrac)} of perturbations → **${rob.robust ? "robust" : "fragile"}**`);
+        L.push(`- Most influential (leave-one-out Δ): ` + rob.influence.slice(0, 5).map((i) => `${i.name} ${(i.delta >= 0 ? "+" : "") + (i.delta * 100).toFixed(1)}pts`).join("; "));
+      } catch {}
+    }
+
+    const groups = (state.groups || []).filter((g) => state.evidence.some((e) => e.group === g.id));
+    if (groups.length) {
+      L.push(`\n## Dependency groups`);
+      groups.forEach((g) => {
+        const n = state.evidence.filter((e) => e.group === g.id).length;
+        const nEff = n <= 1 ? n : 1 + (n - 1) * (1 - (g.rho || 0));
+        L.push(`- **${g.label}** — ${n} members, ρ=${(g.rho || 0).toFixed(2)} → ≈${nEff.toFixed(2)} independent`);
+      });
+    }
+
+    L.push(`\n## Criteria`);
+    r.evidence.forEach((e) => {
+      const o = state.evidence.find((x) => x.id === e.id);
+      L.push(`\n### ${o.name}${e.enabled === false ? " (excluded)" : ""}`);
+      L.push(`- P(E|${pro.short}) = ${(o.likelihoods[pro.id] ?? 0.5)}, P(E|${con.short}) = ${(o.likelihoods[con.id] ?? 0.5)}, weight ${o.weight ?? 1}${o.group ? `, group "${(findGroup(o.group) || {}).label || o.group}"` : ""}`);
+      L.push(`- Evidence: ${(e.decibans >= 0 ? "+" : "") + fmtNum(e.decibans, 1)} decibans`);
+      const ai = aiIndex[e.id];
+      if (ai && (ai.dataPoints || []).length) {
+        L.push(`- Data points (historical-critical assessment):`);
+        ai.dataPoints.forEach((d) => {
+          const v = d.verified ? "verbatim✓" : "UNVERIFIED";
+          L.push(`  - [${d.supports}] ${d.counts ? "COUNTS" : "does not count"} · ${d.provenance}${d.cited_source ? " (" + d.cited_source + ")" : ""} · ${d.validity} · ${v}`);
+          if (d.quote) L.push(`    > ${d.quote.replace(/\s+/g, " ").trim()}`);
+          if (d.author_assessment) L.push(`    Author's assessment: ${d.author_assessment}`);
+        });
+      }
+      (o.references || []).forEach((ref) => L.push(`- Ref: ${ref}`));
+    });
+    L.push(`\n---\n_All quotations are verbatim substrings of uploaded sources; unverifiable quotes are flagged and never counted. Numbers are editable priors/likelihoods, not assertions of fact._`);
+    return L.join("\n");
+  }
+
+  function downloadReport() {
+    const md = buildAuditMarkdown();
+    const blob = new Blob([md], { type: "text/markdown" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "resurrection-analysis-report.md";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast("Report downloaded");
+  }
+
+  function buildDependencyHtml() {
+    const groups = (state.groups || []);
+    const count = {};
+    state.evidence.forEach((e) => { if (e.enabled !== false && e.group) count[e.group] = (count[e.group] || 0) + 1; });
+    const active = groups.filter((g) => (count[g.id] || 0) > 1);
+    if (!active.length) return "";
+    const rows = active.map((g) => {
+      const n = count[g.id];
+      const nEff = 1 + (n - 1) * (1 - (g.rho || 0));
+      return `<tr><td>${esc(g.label)}</td><td class="num">${n}</td><td class="num">${Math.round((g.rho || 0) * 100)}%</td>
+        <td class="num">${nEff.toFixed(2)}</td><td class="num">×${(nEff / n).toFixed(2)}</td></tr>`;
+    }).join("");
+    return `
+      <h3>Dependency discounting (anti-double-counting)</h3>
+      <p>Correlated criteria are not counted as independent witnesses. Each group's evidence is shrunk to an
+         effective number of independent sources, so one tradition cannot be multiplied several times.</p>
+      <table class="report-table">
+        <tr><th>Group</th><th>Members</th><th>ρ</th><th>≈ independent</th><th>Evidence ×</th></tr>${rows}
+      </table>`;
+  }
+
   function buildRobustnessHtml() {
     if (!window.BayesRobustness) return "";
     let rob;
@@ -603,6 +692,8 @@
       <p><strong>Net evidential swing:</strong> ${(totalSwing > 0 ? "+" : "") + fmtNum(totalSwing, 1)} decibans
          toward ${totalSwing >= 0 ? esc(pro.short) : esc(con.short)}
          (${window.BayesEngine.bfStrength(r.totals.logBFsum)}).</p>
+
+      ${buildDependencyHtml()}
 
       ${buildRobustnessHtml()}
 
@@ -707,15 +798,25 @@
       <p>Each hypothesis declares its <em>auxiliary assumptions</em>, each with a plausibility. Their product
          multiplies the prior: <code>P(H & A1 & A2 …) = P(H)·ΠP(Ai)</code>. A theory that must assume many
          improbable things pays for it automatically — the Bayesian form of Occam's razor.</p>
-      <h3>4 · Independence weights</h3>
-      <p>Correlated data (e.g. four Gospels echoing one tradition) would be over-counted under naive
-         independence. The <code>weight ∈ [0,1]</code> on each datum down-weights its log-likelihood so you can
-         model that dependence explicitly instead of pretending it away.</p>
-      <h3>5 · No hallucinated citations</h3>
+      <h3>4 · Independence weights and dependency groups</h3>
+      <p>The single most common error in arguments like this is <strong>double-counting correlated evidence</strong>:
+         multiplying the creed, the appearance reports, and the disciples' transformation as if they were
+         independent witnesses, when they are largely one early tradition seen three ways. Two controls:</p>
+      <p>The per-datum <code>weight ∈ [0,1]</code> down-weights a single datum's log-likelihood. More importantly,
+         <strong>dependency groups</strong> let you mark a set of criteria as correlated with a parameter
+         <code>ρ ∈ [0,1]</code>. The group's combined evidence is shrunk to an effective number of independent
+         sources <code>n_eff = 1 + (n−1)(1−ρ)</code> and scaled by <code>n_eff/n</code>: at ρ=0 they are independent,
+         at ρ=1 the whole group counts as one source. This is why the default posterior is lower than a naïve
+         multiplication would give — it refuses to count one tradition several times.</p>
+      <h3>5 · Robustness &amp; audit trail</h3>
+      <p>On Recalculate the report runs a 2,000-draw prior-sensitivity analysis (a 94% interval, not a point
+         estimate) and a leave-one-out influence ranking, and you can download a full Markdown report — the
+         priors, likelihoods, per-datum assessments, citations, and robustness — as a reproducible audit trail.</p>
+      <h3>6 · No hallucinated citations</h3>
       <p>Every quotation in the detail drawer is a literal substring of a file you uploaded. If a passage
          does not exist in your sources, it cannot be displayed, and the AI engine discards any quote that
          fails the verbatim check — so a discarded quote can never count toward a probability.</p>
-      <h3>6 · Historical-critical assessment of each data point (✦ AI)</h3>
+      <h3>7 · Historical-critical assessment of each data point (✦ AI)</h3>
       <p>With Claude connected, clicking <strong>R</strong> or <strong>¬R</strong> lists every data point the
          author(s) use for that side, each classified by provenance — <em>quotes a source</em>,
          <em>historical reference</em>, <em>author's inference</em>, or <em>bare opinion</em> — with the author's
@@ -819,10 +920,76 @@
   function renderAll() {
     recompute();
     renderHypotheses();
+    renderGroups();
     renderSources();
   }
 
+  // =========================================================================
+  // Evidence dependency groups (anti-double-counting)
+  // =========================================================================
+  function renderGroups() {
+    const box = $("#dep-panel");
+    if (!box) return;
+    state.groups = state.groups || [];
+    const groups = state.groups;
+    const count = {};
+    state.evidence.forEach((e) => { if (e.group) count[e.group] = (count[e.group] || 0) + 1; });
+
+    let html = `<p class="hint">Correlated criteria (the same underlying source or tradition) must not be
+      multiplied as if independent. Group them and set how correlated they are (ρ); the engine discounts the
+      group to an <em>effective number of independent sources</em>. ρ=0 → independent; ρ=1 → counts as one.</p>`;
+    if (!groups.length) html += `<p class="parsimony-note">No groups — every criterion is treated as independent.</p>`;
+
+    groups.forEach((g) => {
+      const n = count[g.id] || 0;
+      const nEff = n <= 1 ? n : 1 + (n - 1) * (1 - (g.rho || 0));
+      html += `<div class="dep-group">
+        <input class="dep-label" type="text" value="${esc(g.label)}" data-glabel="${g.id}">
+        <div class="prior-row"><span>ρ</span>
+          <input type="range" min="0" max="100" value="${Math.round((g.rho || 0) * 100)}" data-grho="${g.id}">
+          <span class="pv" data-grhov="${g.id}">${Math.round((g.rho || 0) * 100)}%</span></div>
+        <div class="parsimony-note">${n} member(s) → counts as ~<strong>${nEff.toFixed(2)}</strong> independent source(s)</div>
+        <button class="btn danger" data-gdel="${g.id}">remove group</button>
+      </div>`;
+    });
+    html += `<button class="btn small" id="add-group">+ New group</button>`;
+    html += `<div class="dep-assign"><div class="alabel">Assign criteria to a group</div>`;
+    state.evidence.forEach((e) => {
+      const opts = `<option value="">— independent —</option>` +
+        groups.map((g) => `<option value="${g.id}" ${e.group === g.id ? "selected" : ""}>${esc(g.label)}</option>`).join("");
+      html += `<div class="dep-row"><span>${esc(e.name)}</span><select data-gassign="${e.id}">${opts}</select></div>`;
+    });
+    html += `</div>`;
+    box.innerHTML = html;
+
+    $$("[data-glabel]").forEach((i) => i.onchange = () => { const g = findGroup(i.dataset.glabel); if (g) { g.label = i.value; persist(); renderGroups(); } });
+    $$("[data-grho]").forEach((r) => {
+      r.oninput = () => { const pv = $(`[data-grhov="${r.dataset.grho}"]`); if (pv) pv.textContent = r.value + "%"; };
+      r.onchange = () => { const g = findGroup(r.dataset.grho); if (g) { g.rho = +r.value / 100; recompute(); renderGroups(); } };
+    });
+    $$("[data-gdel]").forEach((b) => b.onclick = () => {
+      const id = b.dataset.gdel;
+      state.groups = state.groups.filter((g) => g.id !== id);
+      state.evidence.forEach((e) => { if (e.group === id) delete e.group; });
+      recompute(); renderGroups();
+    });
+    const add = $("#add-group");
+    if (add) add.onclick = () => {
+      const label = prompt('Group name (e.g. "Synoptic-dependent reports"):');
+      if (!label) return;
+      state.groups.push({ id: "g-" + Math.random().toString(36).slice(2, 7), label: label.trim(), rho: 0.5 });
+      recompute(); renderGroups();
+    };
+    $$("[data-gassign]").forEach((s) => s.onchange = () => {
+      const e = state.evidence.find((x) => x.id === s.dataset.gassign);
+      if (!e) return;
+      if (s.value) e.group = s.value; else delete e.group;
+      recompute(); renderGroups();
+    });
+  }
+
   function boot() {
+    state.groups = state.groups || [];
     // Point PDF.js at its worker (same CDN/version as the library in index.html).
     if (window.pdfjsLib) {
       window.pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -875,6 +1042,7 @@
       const txt = $("#analysis-prompt").textContent;
       navigator.clipboard?.writeText(txt).then(() => toast("Prompt copied")).catch(() => toast("Copy failed"));
     };
+    $("#btn-download-report").onclick = downloadReport;
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         closeDrawer();
