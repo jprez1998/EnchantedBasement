@@ -6,7 +6,7 @@
   <title>Enchanted Basement · Resurrection Bayes Table</title>
   <meta name="description" content="An interactive Bayesian model-comparison tool for assessing the historical plausibility of the death, burial, and resurrection of Jesus." />
   <link rel="icon" type="image/png" href="Small Logo.png" />
-  <link rel="stylesheet" href="css/styles.css?v=20" />
+  <link rel="stylesheet" href="css/styles.css?v=21" />
 </head>
 <body>
   <header class="site-header">
@@ -168,8 +168,34 @@
       <div id="report-content" class="modal-body"><!-- injected --></div>
       <div class="modal-foot">
         <button id="btn-copy-prompt" class="btn small">Copy analysis prompt</button>
+        <button id="btn-apply-analysis" class="btn small">Apply analysis (.json)</button>
         <button id="btn-download-report" class="btn small">Download report (.md)</button>
         <button id="report-ok" class="btn primary">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Apply external analysis modal ----------------------------------------->
+  <div id="apply-backdrop" class="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-head"><h2>Apply analysis (no API)</h2>
+        <button id="apply-close" class="drawer-close" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <p>Paste (or load) an analysis produced offline — e.g. by Claude Code after you exported this model.
+           It sets the per-hypothesis likelihoods, the κ quality factors, and the per-criterion extracts, exactly
+           like an in-app AI run, but with <strong>no API call or cost</strong>.</p>
+        <p class="parsimony-note">Quotes are re-checked verbatim against your loaded sources where possible; if the
+           sources aren't loaded in this browser, the quotes are trusted but flagged "external". Expected JSON:
+           <code>{ "criteria": [ { "id", "hyp_likelihoods":[{ "hyp_id", "p" }], "quality", "quality_reason",
+           "rationale", "data_points":[…] } ], "overall" }</code>.</p>
+        <label class="btn small">Load .json<input id="apply-file" type="file" accept="application/json,.json" hidden /></label>
+        <textarea id="apply-json" class="paste-box" style="min-height:140px;margin-top:10px" placeholder="…or paste the analysis JSON here"></textarea>
+        <div id="apply-status" class="key-status" hidden></div>
+      </div>
+      <div class="modal-foot">
+        <button id="apply-cancel" class="btn small">Cancel</button>
+        <button id="apply-go" class="btn primary">Apply</button>
       </div>
     </div>
   </div>
@@ -241,12 +267,12 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <script src="js/bayes.js?v=20"></script>
-  <script src="js/criteria.js?v=20"></script>
-  <script src="js/robustness.js?v=20"></script>
-  <script src="js/calibration.js?v=20"></script>
-  <script src="js/sources.js?v=20"></script>
-  <script src="js/claude.js?v=20"></script>
-  <script src="js/app.js?v=20"></script>
+  <script src="js/bayes.js?v=21"></script>
+  <script src="js/criteria.js?v=21"></script>
+  <script src="js/robustness.js?v=21"></script>
+  <script src="js/calibration.js?v=21"></script>
+  <script src="js/sources.js?v=21"></script>
+  <script src="js/claude.js?v=21"></script>
+  <script src="js/app.js?v=21"></script>
 </body>
 </html>

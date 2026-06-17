@@ -447,7 +447,11 @@
     const fallacy = (d.fallacy && d.fallacy !== "none") ? `<span class="dp-fallacy">${esc(FALLACY_LABEL[d.fallacy] || d.fallacy)}</span>` : "";
     const adhoc = (d.ad_hoc && d.fallacy !== "ad_hoc") ? `<span class="dp-fallacy">⚑ ad hoc</span>` : "";
     const attest = d.independently_attested ? `<span class="dp-flag ok" title="Multiple attestation">independently attested</span>` : "";
-    const verified = d.verified ? `<span class="dp-flag ok">verbatim ✓</span>` : `<span class="dp-flag warn">⚠ quote unverified — discarded</span>`;
+    const verified = d.verified
+      ? `<span class="dp-flag ok">verbatim ✓</span>`
+      : d.external
+      ? `<span class="dp-flag warn" title="Sources were not loaded in the browser at apply time, so this quote was not re-verified against the source text.">external — not re-verified</span>`
+      : `<span class="dp-flag warn">⚠ quote unverified — discarded</span>`;
     const sideWord = d.supports === "R" ? "Resurrection" : d.supports === "N" ? "Naturalistic" : "the hypotheses";
     return `
       <div class="dp ${cls}">
@@ -946,24 +950,57 @@
       return false;
     }
     // Apply Claude's likelihoods to the model and capture its reasoning.
+    const stats = applyAssessment(res);
+    hideProgress();
+    const modeNote = res.mode === "map-reduce"
+      ? ` — deep-read ${res.sourcesRead} sources in ${res.calls} passes${res.mapModel && res.mapModel !== res.model ? " (Haiku extract → " + res.model.replace("claude-", "").replace(/-/g, " ") + " score)" : ""}`
+      : res.mode === "retrieval"
+      ? ` — retrieval over ${res.sourcesRead} sources (${res.passagesMatched} passages)`
+      : (res.truncated ? " — sources truncated to fit" : "");
+    toast(`Claude assessed ${stats.applied} criteria · ${stats.totalDP} data point${stats.totalDP === 1 ? "" : "s"}, ${stats.countedDP} counted` + modeNote);
+    return true;
+  }
+
+  // Verbatim check used when applying any assessment (API or imported).
+  function aiNormalize(s) { return String(s || "").replace(/\s+/g, " ").trim().toLowerCase(); }
+
+  /**
+   * Apply an assessment payload (same shape the API returns) to the model:
+   * set per-hypothesis likelihoods + quality, verify quotes against loaded
+   * sources, and populate aiIndex so the drawer shows the extracts. Works for
+   * both the API path and an externally-supplied (e.g. Claude-Code) analysis.
+   */
+  function applyAssessment(res) {
     aiIndex = {};
     let applied = 0, totalDP = 0, countedDP = 0;
     const validIds = new Set(state.hypotheses.map((h) => h.id));
-    res.criteria.forEach((c) => {
+    const loaded = (state.sources || []).filter((s) => (s.text || "").trim());
+    const haystacks = loaded.map((s) => ({ name: s.name, norm: aiNormalize(s.text) }));
+    const haveSources = haystacks.length > 0;
+    const verify = (q) => {
+      const nq = aiNormalize(q);
+      if (nq.length < 8) return null;
+      const hit = haystacks.find((h) => h.norm.includes(nq));
+      return hit ? hit.name : null;
+    };
+    (res.criteria || []).forEach((c) => {
       const ev = state.evidence.find((x) => x.id === c.id);
       if (!ev) return;
-      // Apply a likelihood per hypothesis id Claude returned (R, Nv, Nl, Nd, …).
       (c.hyp_likelihoods || []).forEach((hl) => {
         if (!hl || !validIds.has(hl.hyp_id)) return;
         const p = Math.max(0.01, Math.min(0.99, +hl.p));
         if (isFinite(p)) ev.likelihoods[hl.hyp_id] = p;
       });
-      // Apply the epistemic-quality factor: ad hoc / circular / unfalsifiable /
-      // opinion-only criteria get kappa -> 0 so they cannot move the posterior.
-      if (c.quality != null && isFinite(+c.quality)) {
-        ev.quality = Math.max(0, Math.min(1, +c.quality));
-      }
-      const dataPoints = (c.data_points || []);
+      if (c.quality != null && isFinite(+c.quality)) ev.quality = Math.max(0, Math.min(1, +c.quality));
+      const dataPoints = (c.data_points || []).map((d) => {
+        if (haveSources) {
+          const v = verify(d.quote);
+          return { ...d, verified: !!v, external: false, source: v || d.source || "(unverified)", counts: d.counts === true && !!v };
+        }
+        // No sources loaded to re-verify against — trust the supplied analysis
+        // but mark it "external" so the badge is honest.
+        return { ...d, verified: false, external: true, counts: d.counts === true };
+      });
       totalDP += dataPoints.length;
       countedDP += dataPoints.filter((d) => d.counts).length;
       aiIndex[c.id] = {
@@ -975,15 +1012,8 @@
       };
       applied++;
     });
-    aiOverall = res.overall || "";
-    hideProgress();
-    const modeNote = res.mode === "map-reduce"
-      ? ` — deep-read ${res.sourcesRead} sources in ${res.calls} passes${res.mapModel && res.mapModel !== res.model ? " (Haiku extract → " + res.model.replace("claude-", "").replace(/-/g, " ") + " score)" : ""}`
-      : res.mode === "retrieval"
-      ? ` — retrieval over ${res.sourcesRead} sources (${res.passagesMatched} passages)`
-      : (res.truncated ? " — sources truncated to fit" : "");
-    toast(`Claude assessed ${applied} criteria · ${totalDP} data point${totalDP === 1 ? "" : "s"}, ${countedDP} counted` + modeNote);
-    return true;
+    aiOverall = res.overall || res.overall_parsimony || "";
+    return { applied, totalDP, countedDP, haveSources };
   }
 
   async function onRecalculate() {
@@ -995,6 +1025,40 @@
         await runClaudeAnalysis();
       }
     }
+    openReport();
+  }
+
+  // =========================================================================
+  // Apply analysis (no API) — import a Claude-Code-produced assessment JSON
+  // =========================================================================
+  function openApply() {
+    $("#apply-json").value = "";
+    const st = $("#apply-status");
+    st.hidden = true; st.textContent = ""; st.className = "key-status";
+    $("#apply-backdrop").hidden = false;
+  }
+  function closeApply() { $("#apply-backdrop").hidden = true; }
+
+  function runApply() {
+    const raw = $("#apply-json").value.trim();
+    const st = $("#apply-status");
+    const show = (msg, ok) => { st.hidden = false; st.textContent = msg; st.className = "key-status " + (ok ? "ok" : "warn"); };
+    if (!raw) return show("Nothing to apply — paste the analysis JSON or load a .json file.", false);
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch (e) { return show("Invalid JSON — " + e.message, false); }
+    // Accept either the bare assessment ({criteria,…}) or a wrapper ({assessment:{…}}).
+    const res = parsed && Array.isArray(parsed.criteria) ? parsed
+      : parsed && parsed.assessment && Array.isArray(parsed.assessment.criteria) ? parsed.assessment
+      : null;
+    if (!res) return show('Unrecognised shape — expected a top-level "criteria" array.', false);
+    let stats;
+    try { stats = applyAssessment(res); } catch (e) { return show("Could not apply — " + e.message, false); }
+    recompute();
+    renderAll();
+    persist();
+    closeApply();
+    const note = stats.haveSources ? "" : " — sources not loaded, quotes flagged external";
+    toast(`Applied ${stats.applied} criteria · ${stats.totalDP} data point${stats.totalDP === 1 ? "" : "s"}, ${stats.countedDP} counted${note}`);
     openReport();
   }
 
@@ -1361,12 +1425,27 @@
       navigator.clipboard?.writeText(txt).then(() => toast("Prompt copied")).catch(() => toast("Copy failed"));
     };
     $("#btn-download-report").onclick = downloadReport;
+
+    // Apply analysis (no API) modal
+    $("#btn-apply-analysis").onclick = openApply;
+    $("#apply-close").onclick = $("#apply-cancel").onclick = closeApply;
+    $("#apply-go").onclick = runApply;
+    $("#apply-backdrop").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.hidden = true; });
+    $("#apply-file").onchange = (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = () => { $("#apply-json").value = String(r.result || ""); };
+      r.readAsText(f);
+      e.target.value = "";
+    };
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         closeDrawer();
         $("#report-backdrop").hidden = true;
         $("#help-backdrop").hidden = true;
         $("#settings-backdrop").hidden = true;
+        $("#apply-backdrop").hidden = true;
       }
     });
   }

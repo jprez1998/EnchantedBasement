@@ -254,6 +254,8 @@ body {
 .settings-row.checkbox input { accent-color: var(--gold); width: 18px; height: 18px; }
 .settings-row.checkbox > span { font-weight: 400; }
 .key-status { margin-top: 10px; font-size: 0.82rem; color: #6a5b44; padding: 8px 10px; background: #efe6d2; border-radius: 8px; }
+.key-status.ok { color: #1f5130; background: #d8ecdc; }
+.key-status.warn { color: #7a2e1d; background: #f3ddd2; }
 
 /* Evidence dependency groups */
 .dep-panel { display: flex; flex-direction: column; gap: 10px; }
