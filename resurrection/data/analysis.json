@@ -1,0 +1,62 @@
+{
+  "note": "Committed analysis, applied by the app on load (data/analysis.json). Produced by Claude Code applying source criticism (historian-analyst) + the Bayesian model to the committed corpus. hyp_likelihoods/quality are OMITTED where a source does not justify moving them, so any unlisted criterion stays at the default-model value. Bump 'stamp' on every change so the page re-applies and toasts once.",
+  "stamp": "2026-06-17.01",
+  "label": "1 of 5 sources (Evans review)",
+  "overall": "Corpus so far: a single secondary source — Juan Hernández Jr.'s ~260-word academic review of Craig Evans's Fabricating Jesus (IVP, 2006). It contains no primary datum about the death, burial, or resurrection; it describes a book and flags that book's apologetic assumptions. Applying source criticism, every point extracted from it is a secondary inference or a methodological caution, so none of them counts and no likelihood or quality factor (κ) is changed. The posterior therefore remains at the default-model values. This is the correct, honest result for a meta-source with no bearing on primary evidence — and it shows the model does not move on rhetoric. Awaiting sources 2–5 before any evidential update.",
+  "criteria": [
+    {
+      "id": "legend",
+      "rationale": "Source 1 is a book review (a secondary meta-source). It reports Evans's case that skeptical, extracanonical-gospel-based reconstructions are historically weak and that the fantastic material is late — which would, at second hand, bear weakly against the 'legendary development' account. But the reviewer himself flags the case as assumption-laden, and a review of a book is not a primary datum, so the likelihood is left unchanged.",
+      "data_points": [
+        {
+          "quote": "Evans exposes how such studies rest on shaky historical grounds and offers a sober assessment of the gospel evidence against the backdrop of first century Palestine",
+          "provenance": "author_inference",
+          "cited_source": "Craig A. Evans, Fabricating Jesus (IVP, 2006)",
+          "supports": "R",
+          "validity": "disputed",
+          "fallacy": "none",
+          "ad_hoc": false,
+          "independently_attested": false,
+          "counts": false,
+          "why_quoted": "The reviewer summarises Evans's thesis that skeptical reconstructions built on extracanonical texts lack historical grounding — relevant to whether the resurrection tradition is best explained as late legend.",
+          "author_assessment": "Hernández reports this approvingly as Evans's contribution, but later flags Evans's apologetic assumptions. The claim is the book's thesis, not an independently established datum.",
+          "weight_note": "Does not count: a review reporting a book's apologetic thesis is doubly removed from any primary datum and is uncorroborated here, so it leaves P(legend) unchanged."
+        },
+        {
+          "quote": "Readers are taken on a tour of the various extracanonical gospels, flanked by discussions of their content, date, historical context",
+          "provenance": "quoted_source",
+          "cited_source": "Craig A. Evans, Fabricating Jesus (IVP, 2006)",
+          "supports": "R",
+          "validity": "disputed",
+          "fallacy": "none",
+          "ad_hoc": false,
+          "independently_attested": false,
+          "counts": false,
+          "why_quoted": "Notes that Evans dates and contextualises the extracanonical gospels — the textual basis for many 'legend' arguments.",
+          "author_assessment": "Descriptive of the book's contents; establishes nothing about the date of the canonical resurrection tradition.",
+          "weight_note": "Contextual only; does not move the likelihood."
+        }
+      ]
+    },
+    {
+      "id": "source_independence",
+      "rationale": "The review supplies a methodological caution rather than evidence: it flags that treatments like Evans's assume synoptic priority over John. Criteria that lean on harmonising the gospels should be read with that caution. With a single meta-source this is recorded as a note; it does not lower κ on its own.",
+      "data_points": [
+        {
+          "quote": "the assumption that the synoptic gospels are more reliable than the fourth gospel",
+          "provenance": "author_opinion",
+          "cited_source": "Juan Hernández Jr. (reviewer)",
+          "supports": "N",
+          "validity": "author_opinion",
+          "fallacy": "none",
+          "ad_hoc": false,
+          "independently_attested": false,
+          "counts": false,
+          "why_quoted": "A reliability caution: the reviewer warns that ranking the synoptics above John is an assumption, not a result — relevant wherever the model leans on harmonised gospel reports (e.g. the trans-physical body, source independence).",
+          "author_assessment": "This is Hernández's own critical observation about Evans's method — a meta-level caution, not a datum about the events.",
+          "weight_note": "Does not count: a methodological caution from one review does not by itself move a likelihood or κ; logged for transparency and to be revisited as the corpus grows."
+        }
+      ]
+    }
+  ]
+}

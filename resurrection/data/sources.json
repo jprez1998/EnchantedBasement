@@ -1,0 +1,11 @@
+{
+  "note": "Committed source corpus, read by the app on load (data/sources.json). Each entry mirrors an uploaded source so quotes in data/analysis.json can be verified verbatim in-browser. Maintained by Claude Code via git; do not hand-edit unless you intend to change the corpus.",
+  "sources": [
+    {
+      "id": "src-evans-review-hernandez",
+      "name": "Hernández, review of Evans, Fabricating Jesus (2007)",
+      "kind": "text",
+      "text": "FABRICATING JESUS: HOW MODERN SCHOLARS DISTORT THE GOSPELS. By Craig A. Evans. Downers Grove, IL: InterVarsity Press, 2006. Pp. 204. Cloth, $19.00, ISBN 0-8308-3318-8.\n\nCraig Evans has produced a lucid, learned guide for laypersons alarmed over the endless, literary stream of fantastic portrayals of Jesus in today's culture. The byproducts of recent trends in historical research, Evans exposes how such studies rest on shaky historical grounds and offers a sober assessment of the gospel evidence against the backdrop of first century Palestine. Readers are taken on a tour of the various extracanonical gospels, flanked by discussions of their content, date, historical context, as well as the type of claims that can be made from the data. Evans also introduces readers to the relevance of archeological data for providing the proper historical context for Jesus. The work ends on a constructive note, offering readers details of Jesus' aims and claims derived from the synoptic gospels. Two appendices offer supplemental information on 'free-floating' sayings of Jesus and the Gospel of Judas.\n\nFabricating Jesus is an excellent resource for basic information about the texts, issues, and major players in the historical Jesus debate. Its shortcomings consist primarily in what is assumed at various points. These include the assumption that we may speak in an unqualified manner about Jesus' aims and claims, the assumption that the synoptic gospels are more reliable than the fourth gospel, and the assumption that historical research is somehow critical for the church's faith. Here Kähler's claim that the gospels are 'perfectio respectu finis,' 'perfection with respect to purpose,' is a salutary reminder.\n\nJuan Hernández Jr., Bethel University."
+    }
+  ]
+}

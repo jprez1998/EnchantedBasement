@@ -1260,6 +1260,48 @@
     });
   }
 
+  // =========================================================================
+  // Committed analysis — read data/sources.json + data/analysis.json on load
+  // and apply them (no API). This is how a `git push` updates the live page:
+  // the committed analysis is the source of truth, re-applied every load so a
+  // refresh always reflects exactly what was pushed. Quotes are verified
+  // verbatim against the committed source text. Silently no-ops offline or on
+  // file:// where fetch can't reach the JSON.
+  // =========================================================================
+  async function loadBaked() {
+    let analysis, bakedSources;
+    try {
+      const [aRes, sRes] = await Promise.all([
+        fetch("data/analysis.json", { cache: "no-store" }),
+        fetch("data/sources.json", { cache: "no-store" }),
+      ]);
+      if (aRes && aRes.ok) analysis = await aRes.json();
+      if (sRes && sRes.ok) bakedSources = await sRes.json();
+    } catch { return; }
+    if (!analysis || !Array.isArray(analysis.criteria)) return;
+
+    // Merge committed sources by id so the browser can verify quotes verbatim.
+    if (bakedSources && Array.isArray(bakedSources.sources)) {
+      const byId = new Map((state.sources || []).map((s) => [s.id, s]));
+      bakedSources.sources.forEach((s) => byId.set(s.id, { id: s.id, name: s.name, kind: s.kind || "text", text: s.text || "" }));
+      state.sources = [...byId.values()];
+    }
+    rescanSources();
+    applyAssessment(analysis);
+    recompute();
+    renderHypotheses();
+    renderGroups();
+    renderSources();
+    // Toast once per analysis stamp so a plain refresh isn't noisy.
+    const stamp = analysis.stamp || "";
+    let seen = "";
+    try { seen = localStorage.getItem("eb-baked-stamp") || ""; } catch {}
+    if (stamp && stamp !== seen) {
+      try { localStorage.setItem("eb-baked-stamp", stamp); } catch {}
+      setTimeout(() => toast("Loaded committed analysis · " + (analysis.label || stamp)), 500);
+    }
+  }
+
   let migrated = false;
   function boot() {
     // Migrate an older saved model to the current default schema. The hypotheses
@@ -1282,6 +1324,7 @@
     rescanSources();
     renderAll();
     if (migrated) setTimeout(() => toast("Updated to the latest criteria set — your uploaded sources were kept."), 400);
+    loadBaked();
 
     $("#btn-recalculate").onclick = onRecalculate;
     $("#btn-add-evidence").onclick = addCriterion;
