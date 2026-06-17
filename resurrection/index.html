@@ -6,7 +6,7 @@
   <title>Enchanted Basement · Resurrection Bayes Table</title>
   <meta name="description" content="An interactive Bayesian model-comparison tool for assessing the historical plausibility of the death, burial, and resurrection of Jesus." />
   <link rel="icon" type="image/png" href="Small Logo.png" />
-  <link rel="stylesheet" href="css/styles.css?v=21" />
+  <link rel="stylesheet" href="css/styles.css?v=22" />
 </head>
 <body>
   <header class="site-header">
@@ -23,8 +23,8 @@
       <label class="btn ghost" title="Load a previously exported model">
         Import<input id="file-import" type="file" accept="application/json" hidden />
       </label>
-      <button id="btn-settings" class="btn ghost" title="Connect Claude for AI analysis">✦ AI</button>
       <button id="btn-reset" class="btn ghost" title="Restore the default model">Reset</button>
+
     </div>
   </header>
 
@@ -200,56 +200,6 @@
     </div>
   </div>
 
-  <!-- AI settings modal ----------------------------------------------------->
-  <div id="settings-backdrop" class="modal-backdrop" hidden>
-    <div class="modal" role="dialog" aria-modal="true">
-      <div class="modal-head"><h2>AI analysis (optional)</h2>
-        <button id="settings-close" class="drawer-close" aria-label="Close">×</button>
-      </div>
-      <div class="modal-body">
-        <p>Connect Claude to act as an expert Bayesian + historical-critical scholar.
-           When connected, <strong>Recalculate</strong> sends your uploaded sources and the
-           criteria to Claude, which proposes the likelihoods with reasoning and
-           <strong>verbatim</strong> quotes. Every quote is checked against your sources —
-           anything not found literally is flagged and discarded. You can still edit
-           every number afterward.</p>
-        <p class="parsimony-note">Your API key is stored only in this browser (localStorage) and sent
-           directly to Anthropic. It is never placed in the site's code or shared. Each Recalculate
-           is a billed API call on your Anthropic account. Leave the key blank to keep the tool fully
-           offline and deterministic.</p>
-        <p class="parsimony-note">With many or large sources, Recalculate switches to a map-reduce pass: it
-           reads every source in full across several calls (no truncation), extracting verbatim evidence per
-           criterion, then makes one final scoring pass over the consolidated, de-duplicated evidence — so the
-           same datum repeated across 30 books is not counted 30 times. It will confirm the call count first.</p>
-        <label class="settings-row">
-          <span>Anthropic API key</span>
-          <input id="api-key" type="password" placeholder="sk-ant-…" autocomplete="off" />
-        </label>
-        <label class="settings-row">
-          <span>Analysis model (final scoring)</span>
-          <select id="model-select"></select>
-        </label>
-        <label class="settings-row checkbox">
-          <input id="ai-economy" type="checkbox" />
-          <span>Economy mode — extract with Haiku, score with the model above <span class="muted-note">(recommended; big cost cut on many sources, verbatim-checked)</span></span>
-        </label>
-        <label class="settings-row checkbox">
-          <input id="ai-deepread" type="checkbox" />
-          <span>Deep read — read every source in full <span class="muted-note">(exhaustive but slow & costly; many calls. Off = retrieval: score only the keyword-relevant passages in one call — recommended for large corpora)</span></span>
-        </label>
-        <label class="settings-row checkbox">
-          <input id="ai-on-recalc" type="checkbox" />
-          <span>Run Claude automatically when I press Recalculate</span>
-        </label>
-        <div id="key-status" class="key-status"></div>
-      </div>
-      <div class="modal-foot">
-        <button id="settings-clear" class="btn small">Remove key</button>
-        <button id="settings-save" class="btn primary">Save</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Methodology modal ----------------------------------------------------->
   <div id="help-backdrop" class="modal-backdrop" hidden>
     <div class="modal" role="dialog" aria-modal="true">
@@ -267,12 +217,11 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <script src="js/bayes.js?v=21"></script>
-  <script src="js/criteria.js?v=21"></script>
-  <script src="js/robustness.js?v=21"></script>
-  <script src="js/calibration.js?v=21"></script>
-  <script src="js/sources.js?v=21"></script>
-  <script src="js/claude.js?v=21"></script>
-  <script src="js/app.js?v=21"></script>
+  <script src="js/bayes.js?v=22"></script>
+  <script src="js/criteria.js?v=22"></script>
+  <script src="js/robustness.js?v=22"></script>
+  <script src="js/calibration.js?v=22"></script>
+  <script src="js/sources.js?v=22"></script>
+  <script src="js/app.js?v=22"></script>
 </body>
 </html>

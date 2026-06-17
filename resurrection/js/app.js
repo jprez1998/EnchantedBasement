@@ -14,8 +14,6 @@
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
-  const AI_ON_LS = "eb-ai-on-recalc";
-
   // --- State ---------------------------------------------------------------
   let state = load() || freshState();
   let lastResult = null;       // last BayesEngine.compute(...) output
@@ -898,15 +896,15 @@
          as a Bayes factor rather than an ad-hoc fudge.</p>
 
       ${aiOverall ? `
-      <h3>Claude's analysis ✦</h3>
+      <h3>Analysis summary</h3>
       <p>${esc(aiOverall)}</p>
-      <p class="parsimony-note">Claude proposed the likelihoods now in the table from your sources; every quote below was
-         verified as a literal substring of an uploaded source. Open a criterion to read its reasoning and citations.</p>` : ""}
+      <p class="parsimony-note">Likelihoods were applied from an external analysis. Every quote was
+         verified as a literal substring of an uploaded source where possible. Open a criterion to read its reasoning and citations.</p>` : ""}
 
-      <h3>Optional: send to an LLM for source-grounded commentary</h3>
-      <p>The numbers above are deterministic arithmetic.${window.ClaudeAnalyst && window.ClaudeAnalyst.hasKey()
-        ? " Claude already ran (see above)." : " Connect Claude under ✦ AI to have it run automatically, or"}
-         copy the prompt below into any LLM. It instructs the model to cite verbatim and never fabricate.</p>
+      <h3>Analysis prompt</h3>
+      <p>The numbers above are deterministic arithmetic. Copy the prompt below into any LLM — it instructs the model
+         to cite verbatim and never fabricate. Then use <strong>Apply analysis (.json)</strong> in this report's footer to
+         import the result back in one tap.</p>
       <pre id="analysis-prompt">${esc(buildAnalysisPrompt())}</pre>`;
 
     const tSlider = $("[data-temper]");
@@ -917,51 +915,7 @@
     $("#report-backdrop").hidden = false;
   }
 
-  // =========================================================================
-  // AI-augmented recalculate: optionally call Claude, then show the report
-  // =========================================================================
-  async function runClaudeAnalysis() {
-    rescanSources();
-    // Warn before a multi-pass (map-reduce) run, since each pass is a billed call.
-    const srcs = state.sources.filter((s) => (s.text || "").trim());
-    const totalChars = srcs.reduce((a, s) => a + (s.text || "").length, 0);
-    if (srcs.length > 6 || totalChars > 500000) {
-      const C = window.ClaudeAnalyst;
-      const est = C.estimate(state);
-      const dollars = est.usd < 0.01 ? "<$0.01" : "~$" + est.usd.toFixed(2);
-      const msg = est.mode === "retrieval"
-        ? `${srcs.length} sources (${Math.round(totalChars / 1000)}k chars). Retrieval mode will pull the keyword-relevant ` +
-          `passages from every source and score them in 1 call (${dollars}). For an exhaustive full read, enable "Deep read" ` +
-          `in ✦ AI settings. Continue?`
-        : `${srcs.length} sources (${Math.round(totalChars / 1000)}k chars) — DEEP READ will read every source in full across ` +
-          `~${est.calls - 1} ${C.getEconomy() ? "Haiku" : ""} extraction pass(es) + 1 scoring pass = ~${est.calls} billed calls, ` +
-          `rough cost ${dollars} (approximate). This can take many minutes; keep the tab open. Continue?`;
-      if (!confirm(msg)) return false;
-    }
-    setProgress("Contacting Claude…", 0.1);
-    let res;
-    try {
-      res = await window.ClaudeAnalyst.analyze(state, {
-        onStatus: (m) => setProgress(m, 0.4),
-      });
-    } catch (e) {
-      hideProgress();
-      toast("Claude analysis failed — " + (e && e.message ? e.message : "unknown error"));
-      return false;
-    }
-    // Apply Claude's likelihoods to the model and capture its reasoning.
-    const stats = applyAssessment(res);
-    hideProgress();
-    const modeNote = res.mode === "map-reduce"
-      ? ` — deep-read ${res.sourcesRead} sources in ${res.calls} passes${res.mapModel && res.mapModel !== res.model ? " (Haiku extract → " + res.model.replace("claude-", "").replace(/-/g, " ") + " score)" : ""}`
-      : res.mode === "retrieval"
-      ? ` — retrieval over ${res.sourcesRead} sources (${res.passagesMatched} passages)`
-      : (res.truncated ? " — sources truncated to fit" : "");
-    toast(`Claude assessed ${stats.applied} criteria · ${stats.totalDP} data point${stats.totalDP === 1 ? "" : "s"}, ${stats.countedDP} counted` + modeNote);
-    return true;
-  }
-
-  // Verbatim check used when applying any assessment (API or imported).
+  // Verbatim check used when applying any assessment (imported via Apply analysis).
   function aiNormalize(s) { return String(s || "").replace(/\s+/g, " ").trim().toLowerCase(); }
 
   /**
@@ -1016,15 +970,8 @@
     return { applied, totalDP, countedDP, haveSources };
   }
 
-  async function onRecalculate() {
-    const aiOn = aiEnabled();
-    if (aiOn && window.ClaudeAnalyst && window.ClaudeAnalyst.hasKey()) {
-      if (!state.sources.some((s) => (s.text || "").trim())) {
-        toast("Upload a source first, or turn off AI in ✦ AI settings.");
-      } else {
-        await runClaudeAnalysis();
-      }
-    }
+  function onRecalculate() {
+    recompute();
     openReport();
   }
 
@@ -1144,46 +1091,6 @@
          weight depends on its authenticity and on whether the author's inference from it is valid, not on the
          quotation alone.</p>`;
     $("#help-backdrop").hidden = false;
-  }
-
-  // =========================================================================
-  // AI settings modal
-  // =========================================================================
-  function aiEnabled() { try { return localStorage.getItem(AI_ON_LS) === "1"; } catch { return false; } }
-
-  function openSettings() {
-    const C = window.ClaudeAnalyst;
-    const sel = $("#model-select");
-    sel.innerHTML = C.MODELS.map((m) => `<option value="${m.id}">${esc(m.label)}</option>`).join("");
-    sel.value = C.getModel();
-    $("#api-key").value = C.getKey();
-    $("#ai-economy").checked = C.getEconomy();
-    $("#ai-deepread").checked = C.getDeepRead();
-    $("#ai-on-recalc").checked = aiEnabled();
-    updateKeyStatus();
-    $("#settings-backdrop").hidden = false;
-  }
-  function updateKeyStatus() {
-    const has = !!$("#api-key").value.trim();
-    $("#key-status").textContent = has
-      ? "Key present — Recalculate can call Claude."
-      : "No key — the tool runs fully offline and deterministic.";
-  }
-  function saveSettings() {
-    const C = window.ClaudeAnalyst;
-    C.setKey($("#api-key").value.trim());
-    C.setModel($("#model-select").value);
-    C.setEconomy($("#ai-economy").checked);
-    C.setDeepRead($("#ai-deepread").checked);
-    try { localStorage.setItem(AI_ON_LS, $("#ai-on-recalc").checked ? "1" : "0"); } catch {}
-    $("#settings-backdrop").hidden = true;
-    toast(C.hasKey() ? "AI settings saved" : "Running offline (no key)");
-  }
-  function clearKey() {
-    window.ClaudeAnalyst.setKey("");
-    $("#api-key").value = "";
-    updateKeyStatus();
-    toast("Key removed");
   }
 
   // =========================================================================
@@ -1386,13 +1293,6 @@
     $("#btn-export").onclick = exportModel;
     $("#btn-reset").onclick = resetModel;
 
-    // AI settings
-    $("#btn-settings").onclick = openSettings;
-    $("#settings-close").onclick = () => ($("#settings-backdrop").hidden = true);
-    $("#settings-save").onclick = saveSettings;
-    $("#settings-clear").onclick = clearKey;
-    $("#api-key").oninput = updateKeyStatus;
-    $("#settings-backdrop").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.hidden = true; });
     $("#file-import").onchange = (e) => e.target.files[0] && importModel(e.target.files[0]);
 
     $("#file-sources").onchange = (e) => { addFiles(e.target.files); e.target.value = ""; };
@@ -1444,7 +1344,6 @@
         closeDrawer();
         $("#report-backdrop").hidden = true;
         $("#help-backdrop").hidden = true;
-        $("#settings-backdrop").hidden = true;
         $("#apply-backdrop").hidden = true;
       }
     });
